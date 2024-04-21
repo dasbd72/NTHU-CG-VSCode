@@ -1,4 +1,4 @@
-ARCH=$(uname -p)
+ARCH=$(shell uname -p)
 CC = gcc
 CXX = g++
 
