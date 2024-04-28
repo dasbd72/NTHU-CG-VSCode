@@ -90,8 +90,33 @@ typedef struct
 Shape quad;
 Shape m_shpae;
 vector<Shape> m_shape_list;
-int cur_idx = 0;       // represent which model should be rendered now
-int polygon_mode = 0;  // 0:fill 1:line
+int cur_idx;       // represent which model should be rendered now
+int polygon_mode;  // 0:fill 1:line
+
+static GLvoid Normalize(GLfloat v[3]);
+static GLvoid Cross(GLfloat u[3], GLfloat v[3], GLfloat n[3]);
+Matrix4 translate(Vector3 vec);
+Matrix4 scaling(Vector3 vec);
+Matrix4 rotateX(GLfloat val);
+Matrix4 rotateY(GLfloat val);
+Matrix4 rotateZ(GLfloat val);
+Matrix4 rotate(Vector3 vec);
+void setViewingMatrix();
+void setOrthogonal();
+void setPerspective();
+void ChangeSize(GLFWwindow* window, int width, int height);
+void drawPlane();
+void RenderScene(void);
+void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
+static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos);
+void setShaders();
+void normalization(tinyobj::attrib_t* attrib, vector<GLfloat>& vertices, vector<GLfloat>& colors, tinyobj::shape_t* shape);
+void LoadModels(string model_path);
+void setupRC();
+void resetModelsAndParameters();
+void glPrintContextInfo(bool printExtension);
 
 static GLvoid Normalize(GLfloat v[3]) {
     GLfloat l;
@@ -347,10 +372,10 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
                 polygon_mode = 1 - polygon_mode;
                 break;
             case GLFW_KEY_Z:
-                cur_idx = (cur_idx + 4) % 5;
+                cur_idx = (cur_idx + int(models.size()) - 1) % int(models.size());
                 break;
             case GLFW_KEY_X:
-                cur_idx = (cur_idx + 1) % 5;
+                cur_idx = (cur_idx + 1) % int(models.size());
                 break;
             case GLFW_KEY_O:
                 setOrthogonal();
@@ -388,6 +413,9 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
                 break;
             case GLFW_KEY_U:
                 cur_trans_mode = ViewUp;
+                break;
+            case GLFW_KEY_0:
+                resetModelsAndParameters();
                 break;
         }
     }
@@ -715,6 +743,9 @@ void initParameter() {
 
     setViewingMatrix();
     setPerspective();  // set default projection matrix as perspective matrix
+
+    cur_idx = 0;
+    polygon_mode = 0;
 }
 
 void setupRC() {
@@ -728,6 +759,16 @@ void setupRC() {
     // [TODO] Load five model at here
     for (auto model : model_list)
         LoadModels(model);
+}
+
+void resetModelsAndParameters() {
+    initParameter();
+
+    for (auto& model : models) {
+        model.position = Vector3(0, 0, 0);
+        model.scale = Vector3(1, 1, 1);
+        model.rotation = Vector3(0, 0, 0);
+    }
 }
 
 void glPrintContextInfo(bool printExtension) {
