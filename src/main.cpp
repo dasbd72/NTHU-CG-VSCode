@@ -122,13 +122,11 @@ Matrix4 translate(Vector3 vec) {
 // [TODO] given a scaling vector then output a Matrix4 (Scaling Matrix)
 Matrix4 scaling(Vector3 vec) {
     Matrix4 mat;
-
-    /*
     mat = Matrix4(
-            ...
-    );
-    */
-
+        vec.x, 0.0f, 0.0f, 0.0f,
+        0.0f, vec.y, 0.0f, 0.0f,
+        0.0f, 0.0f, vec.z, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f);
     return mat;
 }
 
@@ -382,6 +380,9 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
             case GLFW_KEY_T:
                 cur_trans_mode = GeoTranslation;
                 break;
+            case GLFW_KEY_S:
+                cur_trans_mode = GeoScaling;
+                break;
         }
     }
 }
@@ -391,6 +392,9 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
     switch (cur_trans_mode) {
         case GeoTranslation:
             models[cur_idx].position.z += yoffset / 20;
+            break;
+        case GeoScaling:
+            models[cur_idx].scale.z += yoffset / 20;
             break;
     }
 }
@@ -415,6 +419,12 @@ static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
             if (mouse_pressed) {
                 models[cur_idx].position.x += (xpos - starting_press_x) / 100;
                 models[cur_idx].position.y -= (ypos - starting_press_y) / 100;
+            }
+            break;
+        case GeoScaling:
+            if (mouse_pressed) {
+                models[cur_idx].scale.x += (xpos - starting_press_x) / 100;
+                models[cur_idx].scale.y -= (ypos - starting_press_y) / 100;
             }
             break;
     }
