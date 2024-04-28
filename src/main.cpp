@@ -179,19 +179,83 @@ Matrix4 rotate(Vector3 vec) {
 
 // [TODO] compute viewing matrix accroding to the setting of main_camera
 void setViewingMatrix() {
-    // view_matrix[...] = ...
+    Vector3 p_c = main_camera.center - main_camera.position;
+    Vector3 p_u = main_camera.up_vector - main_camera.position;
+    Vector3 rx = p_c.cross(p_u) / (p_c.cross(p_u)).length();
+    Vector3 rz = -p_c / p_c.length();
+    Vector3 ry = rz.cross(rx);
+
+    view_matrix =
+        Matrix4(
+            rx.x, rx.y, rx.z, 0.0f,
+            ry.x, ry.y, ry.z, 0.0f,
+            rz.x, rz.y, rz.z, 0.0f,
+            0.0f, 0.0f, 0.0f, 1.0f) *
+        Matrix4(
+            1.0f, 0.0f, 0.0f, -main_camera.position.x,
+            0.0f, 1.0f, 0.0f, -main_camera.position.y,
+            0.0f, 0.0f, 1.0f, -main_camera.position.z,
+            0.0f, 0.0f, 0.0f, 1.0f);
 }
 
 // [TODO] compute orthogonal projection matrix
 void setOrthogonal() {
     cur_proj_mode = Orthogonal;
-    // project_matrix [...] = ...
+
+    float x_diff = proj.right - proj.left;
+    float x_sum = proj.right + proj.left;
+    float y_diff = proj.top - proj.bottom;
+    float y_sum = proj.top + proj.bottom;
+    float z_diff = proj.farClip - proj.nearClip;
+    float z_sum = proj.farClip + proj.nearClip;
+
+    project_matrix = Matrix4(
+        2.0f / x_diff, 0.0f, 0.0f, -x_sum / x_diff,
+        0.0f, 2.0f / y_diff, 0.0f, -y_sum / y_diff,
+        0.0f, 0.0f, -2.0f / z_diff, -z_sum / z_diff,
+        0.0f, 0.0f, 0.0f, 1.0f);
 }
 
 // [TODO] compute persepective projection matrix
 void setPerspective() {
     cur_proj_mode = Perspective;
-    // project_matrix [...] = ...
+
+    float fovy = proj.fovy / 180.0 * M_PI / 2.0;
+    float half_height = proj.nearClip * tan(fovy);
+    float half_width = half_height * proj.aspect;
+
+    float x_min = -half_width;
+    float x_max = half_width;
+    float y_min = -half_height;
+    float y_max = half_height;
+    float z_near = proj.nearClip;
+    float z_far = proj.farClip;
+
+    float x_diff = x_max - x_min;
+    float x_sum = x_max + x_min;
+    float y_diff = y_max - y_min;
+    float y_sum = y_max + y_min;
+    float z_diff = z_far - z_near;
+    float z_sum = z_far + z_near;
+    float z_mult = z_far * z_near;
+
+    // Derived from
+    // project_matrix =
+    //     Matrix4(
+    //         2.0f / x_diff, 0.0f, 0.0f, -x_sum / x_diff,
+    //         0.0f, 2.0f / y_diff, 0.0f, -y_sum / y_diff,
+    //         0.0f, 0.0f, 2.0f / z_diff, -z_sum / z_diff,
+    //         0.0f, 0.0f, 0.0f, 1.0f) *
+    //     Matrix4(
+    //         z_near, 0.0f, 0.0f, 0.0f,
+    //         0.0f, z_near, 0.0f, 0.0f,
+    //         0.0f, 0.0f, -z_sum, -z_mult, // Modded
+    //         0.0f, 0.0f, -1.0f, 0.0f); // Modded
+    project_matrix = Matrix4(
+        2.0f * proj.nearClip / x_diff, 0.0f, -x_sum / x_diff, 0.0f,
+        0.0f, 2.0f * proj.nearClip / y_diff, -y_sum / y_diff, 0.0f,
+        0.0f, 0.0f, -z_sum / z_diff, -2.0f * z_mult / z_diff,
+        0.0f, 0.0f, -1.0f, 0.0f);
 }
 
 // Vertex buffers
@@ -228,32 +292,19 @@ void RenderScene(void) {
 
     Matrix4 T, R, S;
     // [TODO] update translation, rotation and scaling
+    T = translate(models[cur_idx].position);
+    R = rotate(models[cur_idx].rotation);
+    S = scaling(models[cur_idx].scale);
 
     Matrix4 MVP;
-    GLfloat mvp[16];
 
     // [TODO] multiply all the matrix
     // [TODO] row-major ---> column-major
-
-    mvp[0] = 1;
-    mvp[4] = 0;
-    mvp[8] = 0;
-    mvp[12] = 0;
-    mvp[1] = 0;
-    mvp[5] = 1;
-    mvp[9] = 0;
-    mvp[13] = 0;
-    mvp[2] = 0;
-    mvp[6] = 0;
-    mvp[10] = 1;
-    mvp[14] = 0;
-    mvp[3] = 0;
-    mvp[7] = 0;
-    mvp[11] = 0;
-    mvp[15] = 1;
+    MVP = project_matrix * view_matrix * T * R * S;
+    MVP.transpose();
 
     // use uniform to send mvp to vertex shader
-    glUniformMatrix4fv(iLocMVP, 1, GL_FALSE, mvp);
+    glUniformMatrix4fv(iLocMVP, 1, GL_FALSE, MVP.get());
     glBindVertexArray(m_shape_list[cur_idx].vao);
     glDrawArrays(GL_TRIANGLES, 0, m_shape_list[cur_idx].vertex_count);
     drawPlane();
@@ -279,6 +330,12 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
                 break;
             case GLFW_KEY_X:
                 cur_idx = (cur_idx + 1) % 5;
+                break;
+            case GLFW_KEY_O:
+                setOrthogonal();
+                break;
+            case GLFW_KEY_P:
+                setPerspective();
                 break;
         }
     }
