@@ -114,7 +114,7 @@ Matrix4 translate(Vector3 vec) {
 
     /*
     mat = Matrix4(
-            ...
+        ...
     );
     */
 
@@ -283,12 +283,48 @@ void drawPlane() {
                        0.0, 1.0, 0.0};
 
     // [TODO] draw the plane with above vertices and color
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+    Matrix4 T, R, S;
+    T = translate(Vector3(0, 0, 0));
+    R = rotate(Vector3(0, 0, 0));
+    S = scaling(Vector3(1, 1, 1));
+
+    Matrix4 MVP = project_matrix * view_matrix * T * R * S;
+    MVP.transpose();
+    glUniformMatrix4fv(iLocMVP, 1, GL_FALSE, MVP.get());
+
+    Shape plane;
+    glGenVertexArrays(1, &plane.vao);
+    glBindVertexArray(plane.vao);
+
+    glGenBuffers(1, &plane.vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, plane.vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    plane.vertex_count = 6;
+
+    glGenBuffers(1, &plane.p_color);
+    glBindBuffer(GL_ARRAY_BUFFER, plane.p_color);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+
+    glDrawArrays(GL_TRIANGLES, 0, plane.vertex_count);
 }
 
 // Render function for display rendering
 void RenderScene(void) {
     // clear canvas
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+    if (polygon_mode == 0) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    } else if (polygon_mode == 1) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    }
 
     Matrix4 T, R, S;
     // [TODO] update translation, rotation and scaling
@@ -319,11 +355,6 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
                 break;
             case GLFW_KEY_W:
                 polygon_mode = 1 - polygon_mode;
-                if (polygon_mode == 0) {
-                    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-                } else if (polygon_mode == 1) {
-                    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-                }
                 break;
             case GLFW_KEY_Z:
                 cur_idx = (cur_idx + 4) % 5;
@@ -612,13 +643,6 @@ void setupRC() {
     // [TODO] Load five model at here
     for (auto model : model_list)
         LoadModels(model);
-
-    // Initialize polygon mode
-    if (polygon_mode == 0) {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    } else if (polygon_mode == 1) {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    }
 }
 
 void glPrintContextInfo(bool printExtension) {
