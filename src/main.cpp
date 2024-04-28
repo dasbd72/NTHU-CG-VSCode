@@ -260,6 +260,16 @@ void RenderScene(void) {
 
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     // [TODO] Call back function for keyboard
+    if (action == GLFW_PRESS) {
+        switch (key) {
+            case GLFW_KEY_Z:
+                cur_idx = (cur_idx + 4) % 5;
+                break;
+            case GLFW_KEY_X:
+                cur_idx = (cur_idx + 1) % 5;
+                break;
+        }
+    }
 }
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
@@ -518,7 +528,8 @@ void setupRC() {
     glClearColor(0.2, 0.2, 0.2, 1.0);
     vector<string> model_list{"../ColorModels/bunny5KC.obj", "../ColorModels/dragon10KC.obj", "../ColorModels/lucy25KC.obj", "../ColorModels/teapot4KC.obj", "../ColorModels/dolphinC.obj"};
     // [TODO] Load five model at here
-    LoadModels(model_list[cur_idx]);
+    for (auto model : model_list)
+        LoadModels(model);
 }
 
 void glPrintContextInfo(bool printExtension) {
