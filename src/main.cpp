@@ -90,8 +90,10 @@ typedef struct
 Shape quad;
 Shape m_shpae;
 vector<Shape> m_shape_list;
-int cur_idx;       // represent which model should be rendered now
-int polygon_mode;  // 0:fill 1:line
+int window_width = WINDOW_WIDTH;
+int window_height = WINDOW_HEIGHT;
+int cur_idx = 0;       // represent which model should be rendered now
+int polygon_mode = 0;  // 0:fill 1:line
 
 static GLvoid Normalize(GLfloat v[3]);
 static GLvoid Cross(GLfloat u[3], GLfloat v[3], GLfloat n[3]);
@@ -280,6 +282,14 @@ GLuint VAO, VBO;
 void ChangeSize(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
     // [TODO] change your aspect ratio
+    window_width = width;
+    window_height = height;
+    proj.aspect = (float)window_width / (float)window_height;
+    if (cur_proj_mode == Perspective) {
+        setPerspective();
+    } else {
+        setOrthogonal();
+    }
 }
 
 void drawPlane() {
@@ -735,7 +745,7 @@ void initParameter() {
     proj.nearClip = 0.001;
     proj.farClip = 100.0;
     proj.fovy = 80;
-    proj.aspect = (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT;
+    proj.aspect = (float)window_width / (float)window_height;
 
     main_camera.position = Vector3(0.0f, 0.0f, 2.0f);
     main_camera.center = Vector3(0.0f, 0.0f, 0.0f);
