@@ -584,7 +584,9 @@ void LoadModels(string model_path) {
         exit(1);
     }
 
-    printf("Load Models Success ! Shapes size %d Maerial size %d\n", shapes.size(), materials.size());
+    std::cout << "Load Model " << model_path
+              << " Success! Shapes size " << shapes.size()
+              << " Materials size " << materials.size() << "\n";
 
     normalization(&attrib, vertices, colors, &shapes[0]);
 
