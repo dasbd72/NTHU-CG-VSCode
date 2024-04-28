@@ -91,6 +91,7 @@ Shape quad;
 Shape m_shpae;
 vector<Shape> m_shape_list;
 int cur_idx = 0;  // represent which model should be rendered now
+int polygon_mode = 0; // 0:fill 1:line
 
 static GLvoid Normalize(GLfloat v[3]) {
     GLfloat l;
@@ -262,6 +263,14 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
     // [TODO] Call back function for keyboard
     if (action == GLFW_PRESS) {
         switch (key) {
+            case GLFW_KEY_W:
+                polygon_mode = 1 - polygon_mode;
+                if (polygon_mode == 0) {
+                    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                } else if (polygon_mode == 1) {
+                    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                }
+                break;
             case GLFW_KEY_Z:
                 cur_idx = (cur_idx + 4) % 5;
                 break;
@@ -530,6 +539,13 @@ void setupRC() {
     // [TODO] Load five model at here
     for (auto model : model_list)
         LoadModels(model);
+
+    // Initialize polygon mode
+    if (polygon_mode == 0) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    } else if (polygon_mode == 1) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    }
 }
 
 void glPrintContextInfo(bool printExtension) {
