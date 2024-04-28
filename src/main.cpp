@@ -263,6 +263,9 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
     // [TODO] Call back function for keyboard
     if (action == GLFW_PRESS) {
         switch (key) {
+            case GLFW_KEY_ESCAPE:
+                glfwSetWindowShouldClose(window, true);
+                break;
             case GLFW_KEY_W:
                 polygon_mode = 1 - polygon_mode;
                 if (polygon_mode == 0) {
