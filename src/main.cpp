@@ -90,8 +90,8 @@ typedef struct
 Shape quad;
 Shape m_shpae;
 vector<Shape> m_shape_list;
-int cur_idx = 0;  // represent which model should be rendered now
-int polygon_mode = 0; // 0:fill 1:line
+int cur_idx = 0;       // represent which model should be rendered now
+int polygon_mode = 0;  // 0:fill 1:line
 
 static GLvoid Normalize(GLfloat v[3]) {
     GLfloat l;
@@ -309,7 +309,6 @@ void RenderScene(void) {
     glDrawArrays(GL_TRIANGLES, 0, m_shape_list[cur_idx].vertex_count);
     drawPlane();
 }
-
 
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     // [TODO] Call back function for keyboard
