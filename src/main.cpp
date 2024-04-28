@@ -133,39 +133,33 @@ Matrix4 scaling(Vector3 vec) {
 // [TODO] given a float value then ouput a rotation matrix alone axis-X (rotate alone axis-X)
 Matrix4 rotateX(GLfloat val) {
     Matrix4 mat;
-
-    /*
     mat = Matrix4(
-            ...
-    );
-    */
-
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, cos(val), -sin(val), 0.0f,
+        0.0f, sin(val), cos(val), 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f);
     return mat;
 }
 
 // [TODO] given a float value then ouput a rotation matrix alone axis-Y (rotate alone axis-Y)
 Matrix4 rotateY(GLfloat val) {
     Matrix4 mat;
-
-    /*
     mat = Matrix4(
-            ...
-    );
-    */
-
+        cos(val), 0.0f, sin(val), 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        -sin(val), 0.0f, cos(val), 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f);
     return mat;
 }
 
 // [TODO] given a float value then ouput a rotation matrix alone axis-Z (rotate alone axis-Z)
 Matrix4 rotateZ(GLfloat val) {
     Matrix4 mat;
-
-    /*
     mat = Matrix4(
-            ...
-    );
-    */
-
+        cos(val), -sin(val), 0.0f, 0.0f,
+        sin(val), cos(val), 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f);
     return mat;
 }
 
@@ -383,6 +377,9 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
             case GLFW_KEY_S:
                 cur_trans_mode = GeoScaling;
                 break;
+            case GLFW_KEY_R:
+                cur_trans_mode = GeoRotation;
+                break;
         }
     }
 }
@@ -395,6 +392,9 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
             break;
         case GeoScaling:
             models[cur_idx].scale.z += yoffset / 20;
+            break;
+        case GeoRotation:
+            models[cur_idx].rotation.z += yoffset / 20;
             break;
     }
 }
@@ -425,6 +425,12 @@ static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
             if (mouse_pressed) {
                 models[cur_idx].scale.x += (xpos - starting_press_x) / 100;
                 models[cur_idx].scale.y -= (ypos - starting_press_y) / 100;
+            }
+            break;
+        case GeoRotation:
+            if (mouse_pressed) {
+                models[cur_idx].rotation.x += (ypos - starting_press_y) / 100;
+                models[cur_idx].rotation.y += (xpos - starting_press_x) / 100;
             }
             break;
     }
