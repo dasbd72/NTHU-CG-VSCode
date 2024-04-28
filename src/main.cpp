@@ -26,8 +26,8 @@ const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 600;
 
 bool mouse_pressed = false;
-int starting_press_x = -1;
-int starting_press_y = -1;
+double starting_press_x = -1;
+double starting_press_y = -1;
 
 enum TransMode {
     GeoTranslation = 0,
@@ -111,13 +111,11 @@ static GLvoid Cross(GLfloat u[3], GLfloat v[3], GLfloat n[3]) {
 // [TODO] given a translation vector then output a Matrix4 (Translation Matrix)
 Matrix4 translate(Vector3 vec) {
     Matrix4 mat;
-
-    /*
     mat = Matrix4(
-        ...
-    );
-    */
-
+        1.0f, 0.0f, 0.0f, vec.x,
+        0.0f, 1.0f, 0.0f, vec.y,
+        0.0f, 0.0f, 1.0f, vec.z,
+        0.0f, 0.0f, 0.0f, 1.0f);
     return mat;
 }
 
@@ -381,20 +379,47 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
                           << "Scaling Matrix:\n"
                           << scaling(models[cur_idx].scale) << "\n";
                 break;
+            case GLFW_KEY_T:
+                cur_trans_mode = GeoTranslation;
+                break;
         }
     }
 }
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-    // [TODO] scroll up positive, otherwise it would be negtive
+    // [TODO] scroll up positive, otherwise it would be negative
+    switch (cur_trans_mode) {
+        case GeoTranslation:
+            models[cur_idx].position.z += yoffset / 20;
+            break;
+    }
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
     // [TODO] mouse press callback function
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+        double xpos, ypos;
+        glfwGetCursorPos(window, &xpos, &ypos);
+        mouse_pressed = true;
+        starting_press_x = xpos;
+        starting_press_y = ypos;
+    } else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
+        mouse_pressed = false;
+    }
 }
 
 static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
     // [TODO] cursor position callback function
+    switch (cur_trans_mode) {
+        case GeoTranslation:
+            if (mouse_pressed) {
+                models[cur_idx].position.x += (xpos - starting_press_x) / 100;
+                models[cur_idx].position.y -= (ypos - starting_press_y) / 100;
+            }
+            break;
+    }
+    starting_press_x = xpos;
+    starting_press_y = ypos;
 }
 
 void setShaders() {
