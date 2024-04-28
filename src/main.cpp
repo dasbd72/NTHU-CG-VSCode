@@ -170,7 +170,7 @@ Matrix4 rotate(Vector3 vec) {
 // [TODO] compute viewing matrix accroding to the setting of main_camera
 void setViewingMatrix() {
     Vector3 p_c = main_camera.center - main_camera.position;
-    Vector3 p_u = main_camera.up_vector - main_camera.position;
+    Vector3 p_u = main_camera.up_vector;
     Vector3 rx = p_c.cross(p_u) / (p_c.cross(p_u)).length();
     Vector3 rz = -p_c / p_c.length();
     Vector3 ry = rz.cross(rx);
@@ -380,6 +380,15 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
             case GLFW_KEY_R:
                 cur_trans_mode = GeoRotation;
                 break;
+            case GLFW_KEY_E:
+                cur_trans_mode = ViewEye;
+                break;
+            case GLFW_KEY_C:
+                cur_trans_mode = ViewCenter;
+                break;
+            case GLFW_KEY_U:
+                cur_trans_mode = ViewUp;
+                break;
         }
     }
 }
@@ -395,6 +404,18 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
             break;
         case GeoRotation:
             models[cur_idx].rotation.z += yoffset / 20;
+            break;
+        case ViewEye:
+            main_camera.position.z += yoffset / 20;
+            setViewingMatrix();
+            break;
+        case ViewCenter:
+            main_camera.center.z += yoffset / 20;
+            setViewingMatrix();
+            break;
+        case ViewUp:
+            main_camera.up_vector.z += yoffset / 20;
+            setViewingMatrix();
             break;
     }
 }
@@ -431,6 +452,27 @@ static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
             if (mouse_pressed) {
                 models[cur_idx].rotation.x += (ypos - starting_press_y) / 100;
                 models[cur_idx].rotation.y += (xpos - starting_press_x) / 100;
+            }
+            break;
+        case ViewEye:
+            if (mouse_pressed) {
+                main_camera.position.x += (xpos - starting_press_x) / 100;
+                main_camera.position.y -= (ypos - starting_press_y) / 100;
+                setViewingMatrix();
+            }
+            break;
+        case ViewCenter:
+            if (mouse_pressed) {
+                main_camera.center.x += (xpos - starting_press_x) / 100;
+                main_camera.center.y -= (ypos - starting_press_y) / 100;
+                setViewingMatrix();
+            }
+            break;
+        case ViewUp:
+            if (mouse_pressed) {
+                main_camera.up_vector.x += (xpos - starting_press_x) / 100;
+                main_camera.up_vector.y -= (ypos - starting_press_y) / 100;
+                setViewingMatrix();
             }
             break;
     }
