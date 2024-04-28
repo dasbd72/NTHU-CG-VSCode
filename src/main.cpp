@@ -310,6 +310,7 @@ void RenderScene(void) {
     drawPlane();
 }
 
+
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     // [TODO] Call back function for keyboard
     if (action == GLFW_PRESS) {
@@ -336,6 +337,19 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
                 break;
             case GLFW_KEY_P:
                 setPerspective();
+                break;
+            case GLFW_KEY_I:
+                std::cout << "Matrix Value:\n"
+                          << "Viewing Matrix:\n"
+                          << view_matrix << "\n"
+                          << "Projection Matrix:\n"
+                          << project_matrix << "\n"
+                          << "Translation Matrix:\n"
+                          << translate(models[cur_idx].position) << "\n"
+                          << "Rotation Matrix:\n"
+                          << rotate(models[cur_idx].rotation) << "\n"
+                          << "Scaling Matrix:\n"
+                          << scaling(models[cur_idx].scale) << "\n";
                 break;
         }
     }
