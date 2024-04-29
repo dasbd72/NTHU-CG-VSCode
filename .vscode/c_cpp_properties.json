@@ -4,6 +4,7 @@
       "name": "MacOS",
       "intelliSenseMode": "clang-arm64",
       "compilerPath": "/usr/bin/g++",
+      "cppStandard": "c++17",
       "includePath": [
         "${workspaceRoot}",
         "${workspaceRoot}/include",
