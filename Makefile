@@ -44,6 +44,7 @@ obj/glad.o: $(glad)/src/glad.c
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 .PHONY: clean
+.NOTPARALLEL: clean
 clean:
 	rm -f $(TARGET) $(objects)
 
