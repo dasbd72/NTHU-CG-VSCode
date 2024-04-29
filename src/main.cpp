@@ -102,6 +102,9 @@ float speed = 0.05;
 float prev_x_pos = 0;
 float prev_y_pos = 0;
 float sensitivity = 0.02;
+int show_fps = 0;
+double last_fps_ts = 0.0;
+int frames_cnt = 0;
 
 static GLvoid Normalize(GLfloat v[3]);
 static GLvoid Cross(GLfloat u[3], GLfloat v[3], GLfloat n[3]);
@@ -425,6 +428,16 @@ void RenderScene(void) {
     glBindVertexArray(m_shape_list[cur_idx].vao);
     glDrawArrays(GL_TRIANGLES, 0, m_shape_list[cur_idx].vertex_count);
     drawPlane();
+
+    // Print fps
+    frames_cnt++;
+    double cur_time = glfwGetTime();
+    if (cur_time - last_fps_ts >= 1.0) {
+        if (show_fps)
+            std::cout << "FPS: " << frames_cnt / (cur_time - last_fps_ts) << "\n";
+        last_fps_ts = cur_time;
+        frames_cnt = 0;
+    }
 }
 
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
@@ -489,6 +502,9 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
                 case GLFW_KEY_0:
                     resetModelsAndParameters();
                     break;
+                case GLFW_KEY_9:
+                    show_fps = 1 - show_fps;
+                    break;
                 case GLFW_KEY_TAB:
                     first_person_mode = 1 - first_person_mode;
                     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -524,6 +540,9 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
                     break;
                 case GLFW_KEY_X:
                     cur_idx = (cur_idx + 1) % int(models.size());
+                    break;
+                case GLFW_KEY_9:
+                    show_fps = 1 - show_fps;
                     break;
                 case GLFW_KEY_TAB:
                     first_person_mode = 1 - first_person_mode;
