@@ -329,14 +329,8 @@ void drawPlane() {
     // [TODO] draw the plane with above vertices and color
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-    Matrix4 T, R, S;
-    T = translate(Vector3(0, 0, 0));
-    R = rotate(Vector3(0, 0, 0));
-    S = scaling(Vector3(1, 1, 1));
-
-    Matrix4 MVP = project_matrix * view_matrix * T * R * S;
-    MVP.transpose();
-    glUniformMatrix4fv(iLocMVP, 1, GL_FALSE, MVP.get());
+    Matrix4 MVP = project_matrix * view_matrix;
+    glUniformMatrix4fv(iLocMVP, 1, GL_TRUE, MVP.get());
 
     Shape plane;
     glGenVertexArrays(1, &plane.vao);
@@ -421,10 +415,9 @@ void RenderScene(void) {
     // [TODO] multiply all the matrix
     // [TODO] row-major ---> column-major
     MVP = project_matrix * view_matrix * T * R * S;
-    MVP.transpose();
 
     // use uniform to send mvp to vertex shader
-    glUniformMatrix4fv(iLocMVP, 1, GL_FALSE, MVP.get());
+    glUniformMatrix4fv(iLocMVP, 1, GL_TRUE, MVP.get());
     glBindVertexArray(m_shape_list[cur_idx].vao);
     glDrawArrays(GL_TRIANGLES, 0, m_shape_list[cur_idx].vertex_count);
     drawPlane();
