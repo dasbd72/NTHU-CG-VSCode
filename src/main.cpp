@@ -117,17 +117,18 @@ Matrix4 rotate(Vector3 vec);
 void setViewingMatrix();
 void setOrthogonal();
 void setPerspective();
-void ChangeSize(GLFWwindow* window, int width, int height);
+void changeSize(GLFWwindow* window, int width, int height);
 void drawPlane();
-void Movement();
-void RenderScene(void);
-void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
-void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
-static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos);
+void movement();
+void renderScene(void);
+void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
+void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
+void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
+void cursorPosCallback(GLFWwindow* window, double xpos, double ypos);
 void setShaders();
 void normalization(tinyobj::attrib_t* attrib, vector<GLfloat>& vertices, vector<GLfloat>& colors, tinyobj::shape_t* shape);
-void LoadModels(string model_path);
+void loadModels(string model_path);
+void initParameter();
 void setupRC();
 void resetModelsAndParameters();
 void glPrintContextInfo(bool printExtension);
@@ -291,7 +292,7 @@ void setPerspective() {
 GLuint VAO, VBO;
 
 // Call back function for window reshape
-void ChangeSize(GLFWwindow* window, int width, int height) {
+void changeSize(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
     // [TODO] change your aspect ratio
     window_width = width;
@@ -353,7 +354,7 @@ void drawPlane() {
     glDrawArrays(GL_TRIANGLES, 0, plane.vertex_count);
 }
 
-void Movement() {
+void movement() {
     Vector3 front_vector = (main_camera.center - main_camera.position).normalize();
     Vector3 right_vector = front_vector.cross(main_camera.up_vector).normalize();
     Vector3 up_vector = right_vector.cross(front_vector).normalize();
@@ -388,7 +389,7 @@ void Movement() {
 }
 
 // Render function for display rendering
-void RenderScene(void) {
+void renderScene(void) {
     // clear canvas
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
@@ -399,7 +400,7 @@ void RenderScene(void) {
     }
 
     if (first_person_mode == 1) {
-        Movement();
+        movement();
     }
 
     setViewingMatrix();
@@ -433,7 +434,7 @@ void RenderScene(void) {
     }
 }
 
-void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     // [TODO] Call back function for keyboard
     if (action == GLFW_PRESS) {
         key_status_list[key] = 1;
@@ -546,7 +547,7 @@ void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
     }
 }
 
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
     // [TODO] scroll up positive, otherwise it would be negative
     if (first_person_mode == 0) {
         switch (cur_trans_mode) {
@@ -572,7 +573,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
     }
 }
 
-void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
+void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
     // [TODO] mouse press callback function
     if (first_person_mode == 0) {
         if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
@@ -587,7 +588,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
     }
 }
 
-static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
+void cursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
     // [TODO] cursor position callback function
     if (first_person_mode == 0) {
         switch (cur_trans_mode) {
@@ -828,7 +829,7 @@ void normalization(tinyobj::attrib_t* attrib, vector<GLfloat>& vertices, vector<
     }
 }
 
-void LoadModels(string model_path) {
+void loadModels(string model_path) {
     vector<tinyobj::shape_t> shapes;
     vector<tinyobj::material_t> materials;
     tinyobj::attrib_t attrib;
@@ -915,7 +916,7 @@ void setupRC() {
     vector<string> model_list{"../ColorModels/bunny5KC.obj", "../ColorModels/dragon10KC.obj", "../ColorModels/lucy25KC.obj", "../ColorModels/teapot4KC.obj", "../ColorModels/dolphinC.obj"};
     // [TODO] Load five model at here
     for (auto model : model_list)
-        LoadModels(model);
+        loadModels(model);
 }
 
 void resetModelsAndParameters() {
@@ -970,12 +971,12 @@ int main(int argc, char** argv) {
     }
 
     // register glfw callback functions
-    glfwSetKeyCallback(window, KeyCallback);
-    glfwSetScrollCallback(window, scroll_callback);
-    glfwSetMouseButtonCallback(window, mouse_button_callback);
-    glfwSetCursorPosCallback(window, cursor_pos_callback);
+    glfwSetKeyCallback(window, keyCallback);
+    glfwSetScrollCallback(window, scrollCallback);
+    glfwSetMouseButtonCallback(window, mouseButtonCallback);
+    glfwSetCursorPosCallback(window, cursorPosCallback);
 
-    glfwSetFramebufferSizeCallback(window, ChangeSize);
+    glfwSetFramebufferSizeCallback(window, changeSize);
     glEnable(GL_DEPTH_TEST);
     // Setup render context
     setupRC();
@@ -983,7 +984,7 @@ int main(int argc, char** argv) {
     // main loop
     while (!glfwWindowShouldClose(window)) {
         // render
-        RenderScene();
+        renderScene();
 
         // swap buffer from back to front
         glfwSwapBuffers(window);
