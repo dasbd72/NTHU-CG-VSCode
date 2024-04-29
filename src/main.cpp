@@ -95,6 +95,14 @@ int window_height = WINDOW_HEIGHT;
 int cur_idx = 0;       // represent which model should be rendered now
 int polygon_mode = 0;  // 0:fill 1:line
 
+// First person view
+int first_person_mode = 0;  // 0:assignment 1:first person
+int key_status_list[GLFW_KEY_LAST + 1];
+float speed = 0.05;
+float prev_x_pos = 0;
+float prev_y_pos = 0;
+float sensitivity = 0.02;
+
 static GLvoid Normalize(GLfloat v[3]);
 static GLvoid Cross(GLfloat u[3], GLfloat v[3], GLfloat n[3]);
 Matrix4 translate(Vector3 vec);
@@ -108,6 +116,7 @@ void setOrthogonal();
 void setPerspective();
 void ChangeSize(GLFWwindow* window, int width, int height);
 void drawPlane();
+void Movement();
 void RenderScene(void);
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
@@ -307,6 +316,13 @@ void drawPlane() {
                        0.0, 0.5, 0.8,
                        0.0, 1.0, 0.0};
 
+    if (first_person_mode == 1) {
+        // Darken the plane
+        for (int i = 0; i < 18; i++) {
+            colors[i] /= 2;
+        }
+    }
+
     // [TODO] draw the plane with above vertices and color
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
@@ -340,6 +356,40 @@ void drawPlane() {
     glDrawArrays(GL_TRIANGLES, 0, plane.vertex_count);
 }
 
+void Movement() {
+    Vector3 front_vector = (main_camera.center - main_camera.position).normalize();
+    Vector3 right_vector = front_vector.cross(main_camera.up_vector).normalize();
+    Vector3 up_vector = right_vector.cross(front_vector).normalize();
+    Vector3 direction;
+
+    if (key_status_list[GLFW_KEY_W]) {
+        direction += front_vector;
+    }
+    if (key_status_list[GLFW_KEY_S]) {
+        direction += -front_vector;
+    }
+    if (key_status_list[GLFW_KEY_D]) {
+        direction += right_vector;
+    }
+    if (key_status_list[GLFW_KEY_A]) {
+        direction += -right_vector;
+    }
+    if (key_status_list[GLFW_KEY_SPACE]) {
+        direction += up_vector;
+    }
+    if (key_status_list[GLFW_KEY_LEFT_SHIFT]) {
+        direction += -up_vector;
+    }
+
+    if (direction.length() == 0) {
+        return;
+    }
+    direction.normalize();
+    direction *= speed;
+    main_camera.position += direction;
+    main_camera.center += direction;
+}
+
 // Render function for display rendering
 void RenderScene(void) {
     // clear canvas
@@ -350,6 +400,12 @@ void RenderScene(void) {
     } else if (polygon_mode == 1) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     }
+
+    if (first_person_mode == 1) {
+        Movement();
+    }
+
+    setViewingMatrix();
 
     Matrix4 T, R, S;
     // [TODO] update translation, rotation and scaling
@@ -374,148 +430,227 @@ void RenderScene(void) {
 void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     // [TODO] Call back function for keyboard
     if (action == GLFW_PRESS) {
-        switch (key) {
-            case GLFW_KEY_ESCAPE:
-                glfwSetWindowShouldClose(window, true);
-                break;
-            case GLFW_KEY_W:
-                polygon_mode = 1 - polygon_mode;
-                break;
-            case GLFW_KEY_Z:
-                cur_idx = (cur_idx + int(models.size()) - 1) % int(models.size());
-                break;
-            case GLFW_KEY_X:
-                cur_idx = (cur_idx + 1) % int(models.size());
-                break;
-            case GLFW_KEY_O:
-                setOrthogonal();
-                break;
-            case GLFW_KEY_P:
-                setPerspective();
-                break;
-            case GLFW_KEY_I:
-                std::cout << "Matrix Value:\n"
-                          << "Viewing Matrix:\n"
-                          << view_matrix << "\n"
-                          << "Projection Matrix:\n"
-                          << project_matrix << "\n"
-                          << "Translation Matrix:\n"
-                          << translate(models[cur_idx].position) << "\n"
-                          << "Rotation Matrix:\n"
-                          << rotate(models[cur_idx].rotation) << "\n"
-                          << "Scaling Matrix:\n"
-                          << scaling(models[cur_idx].scale) << "\n";
-                break;
-            case GLFW_KEY_T:
-                cur_trans_mode = GeoTranslation;
-                break;
-            case GLFW_KEY_S:
-                cur_trans_mode = GeoScaling;
-                break;
-            case GLFW_KEY_R:
-                cur_trans_mode = GeoRotation;
-                break;
-            case GLFW_KEY_E:
-                cur_trans_mode = ViewEye;
-                break;
-            case GLFW_KEY_C:
-                cur_trans_mode = ViewCenter;
-                break;
-            case GLFW_KEY_U:
-                cur_trans_mode = ViewUp;
-                break;
-            case GLFW_KEY_0:
-                resetModelsAndParameters();
-                break;
+        key_status_list[key] = 1;
+    } else if (action == GLFW_RELEASE) {
+        key_status_list[key] = 0;
+    }
+    if (first_person_mode == 0) {
+        if (action == GLFW_PRESS) {
+            switch (key) {
+                case GLFW_KEY_ESCAPE:
+                    glfwSetWindowShouldClose(window, true);
+                    break;
+                case GLFW_KEY_W:
+                    polygon_mode = 1 - polygon_mode;
+                    break;
+                case GLFW_KEY_Z:
+                    cur_idx = (cur_idx + int(models.size()) - 1) % int(models.size());
+                    break;
+                case GLFW_KEY_X:
+                    cur_idx = (cur_idx + 1) % int(models.size());
+                    break;
+                case GLFW_KEY_O:
+                    setOrthogonal();
+                    break;
+                case GLFW_KEY_P:
+                    setPerspective();
+                    break;
+                case GLFW_KEY_I:
+                    std::cout << "Matrix Value:\n"
+                              << "Viewing Matrix:\n"
+                              << view_matrix << "\n"
+                              << "Projection Matrix:\n"
+                              << project_matrix << "\n"
+                              << "Translation Matrix:\n"
+                              << translate(models[cur_idx].position) << "\n"
+                              << "Rotation Matrix:\n"
+                              << rotate(models[cur_idx].rotation) << "\n"
+                              << "Scaling Matrix:\n"
+                              << scaling(models[cur_idx].scale) << "\n";
+                    break;
+                case GLFW_KEY_T:
+                    cur_trans_mode = GeoTranslation;
+                    break;
+                case GLFW_KEY_S:
+                    cur_trans_mode = GeoScaling;
+                    break;
+                case GLFW_KEY_R:
+                    cur_trans_mode = GeoRotation;
+                    break;
+                case GLFW_KEY_E:
+                    cur_trans_mode = ViewEye;
+                    break;
+                case GLFW_KEY_C:
+                    cur_trans_mode = ViewCenter;
+                    break;
+                case GLFW_KEY_U:
+                    cur_trans_mode = ViewUp;
+                    break;
+                case GLFW_KEY_0:
+                    resetModelsAndParameters();
+                    break;
+                case GLFW_KEY_TAB:
+                    first_person_mode = 1 - first_person_mode;
+                    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                    // Need to set cursor position to the center because locking cursor will trigger a mouse movement event
+                    double xpos, ypos;
+                    glfwGetCursorPos(window, &xpos, &ypos);
+                    prev_x_pos = xpos;
+                    prev_y_pos = ypos;
+                    break;
+            }
+        }
+    } else if (first_person_mode == 1) {
+        if (action == GLFW_PRESS) {
+            switch (key) {
+                case GLFW_KEY_ESCAPE:
+                    glfwSetWindowShouldClose(window, true);
+                    break;
+                case GLFW_KEY_I:
+                    std::cout << "Matrix Value:\n"
+                              << "Viewing Matrix:\n"
+                              << view_matrix << "\n"
+                              << "Projection Matrix:\n"
+                              << project_matrix << "\n"
+                              << "Translation Matrix:\n"
+                              << translate(models[cur_idx].position) << "\n"
+                              << "Rotation Matrix:\n"
+                              << rotate(models[cur_idx].rotation) << "\n"
+                              << "Scaling Matrix:\n"
+                              << scaling(models[cur_idx].scale) << "\n";
+                    break;
+                case GLFW_KEY_Z:
+                    cur_idx = (cur_idx + int(models.size()) - 1) % int(models.size());
+                    break;
+                case GLFW_KEY_X:
+                    cur_idx = (cur_idx + 1) % int(models.size());
+                    break;
+                case GLFW_KEY_TAB:
+                    first_person_mode = 1 - first_person_mode;
+                    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                    break;
+            }
         }
     }
 }
 
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
     // [TODO] scroll up positive, otherwise it would be negative
-    switch (cur_trans_mode) {
-        case GeoTranslation:
-            models[cur_idx].position.z += yoffset / 20;
-            break;
-        case GeoScaling:
-            models[cur_idx].scale.z += yoffset / 20;
-            break;
-        case GeoRotation:
-            models[cur_idx].rotation.z += yoffset / 20;
-            break;
-        case ViewEye:
-            main_camera.position.z += yoffset / 20;
-            setViewingMatrix();
-            break;
-        case ViewCenter:
-            main_camera.center.z += yoffset / 20;
-            setViewingMatrix();
-            break;
-        case ViewUp:
-            main_camera.up_vector.z += yoffset / 20;
-            setViewingMatrix();
-            break;
+    if (first_person_mode == 0) {
+        switch (cur_trans_mode) {
+            case GeoTranslation:
+                models[cur_idx].position.z += yoffset / 20;
+                break;
+            case GeoScaling:
+                models[cur_idx].scale.z += yoffset / 20;
+                break;
+            case GeoRotation:
+                models[cur_idx].rotation.z += yoffset / 20;
+                break;
+            case ViewEye:
+                main_camera.position.z += yoffset / 20;
+                break;
+            case ViewCenter:
+                main_camera.center.z += yoffset / 20;
+                break;
+            case ViewUp:
+                main_camera.up_vector.z += yoffset / 20;
+                break;
+        }
     }
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
     // [TODO] mouse press callback function
-    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-        double xpos, ypos;
-        glfwGetCursorPos(window, &xpos, &ypos);
-        mouse_pressed = true;
-        starting_press_x = xpos;
-        starting_press_y = ypos;
-    } else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
-        mouse_pressed = false;
+    if (first_person_mode == 0) {
+        if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+            double xpos, ypos;
+            glfwGetCursorPos(window, &xpos, &ypos);
+            mouse_pressed = true;
+            starting_press_x = xpos;
+            starting_press_y = ypos;
+        } else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
+            mouse_pressed = false;
+        }
     }
 }
 
 static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
     // [TODO] cursor position callback function
-    switch (cur_trans_mode) {
-        case GeoTranslation:
-            if (mouse_pressed) {
-                models[cur_idx].position.x += (xpos - starting_press_x) / 100;
-                models[cur_idx].position.y -= (ypos - starting_press_y) / 100;
-            }
-            break;
-        case GeoScaling:
-            if (mouse_pressed) {
-                models[cur_idx].scale.x += (xpos - starting_press_x) / 100;
-                models[cur_idx].scale.y -= (ypos - starting_press_y) / 100;
-            }
-            break;
-        case GeoRotation:
-            if (mouse_pressed) {
-                models[cur_idx].rotation.x += (ypos - starting_press_y) / 100;
-                models[cur_idx].rotation.y += (xpos - starting_press_x) / 100;
-            }
-            break;
-        case ViewEye:
-            if (mouse_pressed) {
-                main_camera.position.x += (xpos - starting_press_x) / 100;
-                main_camera.position.y -= (ypos - starting_press_y) / 100;
-                setViewingMatrix();
-            }
-            break;
-        case ViewCenter:
-            if (mouse_pressed) {
-                main_camera.center.x += (xpos - starting_press_x) / 100;
-                main_camera.center.y -= (ypos - starting_press_y) / 100;
-                setViewingMatrix();
-            }
-            break;
-        case ViewUp:
-            if (mouse_pressed) {
-                main_camera.up_vector.x += (xpos - starting_press_x) / 100;
-                main_camera.up_vector.y -= (ypos - starting_press_y) / 100;
-                setViewingMatrix();
-            }
-            break;
+    if (first_person_mode == 0) {
+        switch (cur_trans_mode) {
+            case GeoTranslation:
+                if (mouse_pressed) {
+                    models[cur_idx].position.x += (xpos - starting_press_x) / 100;
+                    models[cur_idx].position.y -= (ypos - starting_press_y) / 100;
+                }
+                break;
+            case GeoScaling:
+                if (mouse_pressed) {
+                    models[cur_idx].scale.x += (xpos - starting_press_x) / 100;
+                    models[cur_idx].scale.y -= (ypos - starting_press_y) / 100;
+                }
+                break;
+            case GeoRotation:
+                if (mouse_pressed) {
+                    models[cur_idx].rotation.x += (ypos - starting_press_y) / 100;
+                    models[cur_idx].rotation.y += (xpos - starting_press_x) / 100;
+                }
+                break;
+            case ViewEye:
+                if (mouse_pressed) {
+                    main_camera.position.x += (xpos - starting_press_x) / 100;
+                    main_camera.position.y -= (ypos - starting_press_y) / 100;
+                }
+                break;
+            case ViewCenter:
+                if (mouse_pressed) {
+                    main_camera.center.x += (xpos - starting_press_x) / 100;
+                    main_camera.center.y -= (ypos - starting_press_y) / 100;
+                }
+                break;
+            case ViewUp:
+                if (mouse_pressed) {
+                    main_camera.up_vector.x += (xpos - starting_press_x) / 100;
+                    main_camera.up_vector.y -= (ypos - starting_press_y) / 100;
+                }
+                break;
+        }
+        starting_press_x = xpos;
+        starting_press_y = ypos;
+    } else if (first_person_mode == 1) {
+        float xoffset = (xpos - prev_x_pos) * sensitivity;
+        float yoffset = (prev_y_pos - ypos) * sensitivity;
+        float yaw_offset = xoffset / (2.0f * M_PI);
+        float pitch_offset = yoffset / (2.0f * M_PI);
+
+        Vector3 front_vector = (main_camera.center - main_camera.position).normalize();
+
+        float pitch = atan2f(front_vector.y, sqrt(front_vector.x * front_vector.x + front_vector.z * front_vector.z));
+        float yaw = atan2f(front_vector.z, front_vector.x);
+
+        if (pitch < M_PI / 2.0 && pitch + pitch_offset >= M_PI / 2.0)
+            pitch = M_PI / 2.0 - 0.0001f;
+        else if (pitch > -M_PI / 2.0 && pitch + pitch_offset <= -M_PI / 2.0)
+            pitch = -M_PI / 2.0 + 0.0001f;
+        else
+            pitch += pitch_offset;
+        yaw += yaw_offset;
+
+        Vector3 right_vector = Vector3(cos(yaw + M_PI / 2.0), 0, sin(yaw + M_PI / 2.0));
+
+        float xz_length = cos(pitch);
+        front_vector.x = xz_length * cos(-yaw);
+        front_vector.y = sin(pitch);
+        front_vector.z = xz_length * sin(yaw);
+        front_vector.normalize();
+
+        main_camera.center = main_camera.position + front_vector;
+        main_camera.up_vector = right_vector.cross(front_vector).normalize();
+
+        prev_x_pos = xpos;
+        prev_y_pos = ypos;
     }
-    starting_press_x = xpos;
-    starting_press_y = ypos;
 }
 
 void setShaders() {
