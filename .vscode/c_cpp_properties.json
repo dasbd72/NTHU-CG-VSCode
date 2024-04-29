@@ -4,14 +4,15 @@
       "name": "MacOS",
       "intelliSenseMode": "clang-arm64",
       "compilerPath": "/usr/bin/g++",
+      "cppStandard": "c++17",
       "includePath": [
         "${workspaceRoot}",
         "${workspaceRoot}/include",
         "${workspaceRoot}/modules/glad/include",
         "${workspaceRoot}/modules/glfw-3.4.bin.MACOS/include",
         "/usr/local/include",
-        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include",
-        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++"
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include",
+        "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++"
       ]
     }
   ],
