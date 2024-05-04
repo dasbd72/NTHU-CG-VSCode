@@ -130,7 +130,7 @@ void normalization(tinyobj::attrib_t* attrib, vector<GLfloat>& vertices, vector<
 void loadModels(string model_path);
 void initParameter();
 void setupRC();
-void resetModelsAndParameters();
+void resetTranslations();
 void glPrintContextInfo(bool printExtension);
 
 static GLvoid Normalize(GLfloat v[3]) {
@@ -441,39 +441,62 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
     } else if (action == GLFW_RELEASE) {
         key_status_list[key] = 0;
     }
+    if (action == GLFW_PRESS) {
+        switch (key) {
+            case GLFW_KEY_ESCAPE:
+                glfwSetWindowShouldClose(window, true);
+                break;
+            case GLFW_KEY_I:
+                std::cout << "Matrix Value:\n"
+                          << "Viewing Matrix:\n"
+                          << view_matrix << "\n"
+                          << "Projection Matrix:\n"
+                          << project_matrix << "\n"
+                          << "Translation Matrix:\n"
+                          << translate(models[cur_idx].position) << "\n"
+                          << "Rotation Matrix:\n"
+                          << rotate(models[cur_idx].rotation) << "\n"
+                          << "Scaling Matrix:\n"
+                          << scaling(models[cur_idx].scale) << "\n";
+                break;
+            case GLFW_KEY_Z:
+                cur_idx = (cur_idx + int(models.size()) - 1) % int(models.size());
+                break;
+            case GLFW_KEY_X:
+                cur_idx = (cur_idx + 1) % int(models.size());
+                break;
+            case GLFW_KEY_0:
+                resetTranslations();
+                break;
+            case GLFW_KEY_9:
+                show_fps = 1 - show_fps;
+                break;
+            case GLFW_KEY_TAB:
+                first_person_mode = 1 - first_person_mode;
+                if (first_person_mode == 0) {
+                    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                } else if (first_person_mode == 1) {
+                    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                    // Need to set cursor position to the center otherwise locking cursor will trigger a mouse movement event
+                    double xpos, ypos;
+                    glfwGetCursorPos(window, &xpos, &ypos);
+                    prev_x_pos = xpos;
+                    prev_y_pos = ypos;
+                }
+                break;
+        }
+    }
     if (first_person_mode == 0) {
         if (action == GLFW_PRESS) {
             switch (key) {
-                case GLFW_KEY_ESCAPE:
-                    glfwSetWindowShouldClose(window, true);
-                    break;
                 case GLFW_KEY_W:
                     polygon_mode = 1 - polygon_mode;
-                    break;
-                case GLFW_KEY_Z:
-                    cur_idx = (cur_idx + int(models.size()) - 1) % int(models.size());
-                    break;
-                case GLFW_KEY_X:
-                    cur_idx = (cur_idx + 1) % int(models.size());
                     break;
                 case GLFW_KEY_O:
                     setOrthogonal();
                     break;
                 case GLFW_KEY_P:
                     setPerspective();
-                    break;
-                case GLFW_KEY_I:
-                    std::cout << "Matrix Value:\n"
-                              << "Viewing Matrix:\n"
-                              << view_matrix << "\n"
-                              << "Projection Matrix:\n"
-                              << project_matrix << "\n"
-                              << "Translation Matrix:\n"
-                              << translate(models[cur_idx].position) << "\n"
-                              << "Rotation Matrix:\n"
-                              << rotate(models[cur_idx].rotation) << "\n"
-                              << "Scaling Matrix:\n"
-                              << scaling(models[cur_idx].scale) << "\n";
                     break;
                 case GLFW_KEY_T:
                     cur_trans_mode = GeoTranslation;
@@ -492,55 +515,6 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
                     break;
                 case GLFW_KEY_U:
                     cur_trans_mode = ViewUp;
-                    break;
-                case GLFW_KEY_0:
-                    resetModelsAndParameters();
-                    break;
-                case GLFW_KEY_9:
-                    show_fps = 1 - show_fps;
-                    break;
-                case GLFW_KEY_TAB:
-                    first_person_mode = 1 - first_person_mode;
-                    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-                    // Need to set cursor position to the center because locking cursor will trigger a mouse movement event
-                    double xpos, ypos;
-                    glfwGetCursorPos(window, &xpos, &ypos);
-                    prev_x_pos = xpos;
-                    prev_y_pos = ypos;
-                    break;
-            }
-        }
-    } else if (first_person_mode == 1) {
-        if (action == GLFW_PRESS) {
-            switch (key) {
-                case GLFW_KEY_ESCAPE:
-                    glfwSetWindowShouldClose(window, true);
-                    break;
-                case GLFW_KEY_I:
-                    std::cout << "Matrix Value:\n"
-                              << "Viewing Matrix:\n"
-                              << view_matrix << "\n"
-                              << "Projection Matrix:\n"
-                              << project_matrix << "\n"
-                              << "Translation Matrix:\n"
-                              << translate(models[cur_idx].position) << "\n"
-                              << "Rotation Matrix:\n"
-                              << rotate(models[cur_idx].rotation) << "\n"
-                              << "Scaling Matrix:\n"
-                              << scaling(models[cur_idx].scale) << "\n";
-                    break;
-                case GLFW_KEY_Z:
-                    cur_idx = (cur_idx + int(models.size()) - 1) % int(models.size());
-                    break;
-                case GLFW_KEY_X:
-                    cur_idx = (cur_idx + 1) % int(models.size());
-                    break;
-                case GLFW_KEY_9:
-                    show_fps = 1 - show_fps;
-                    break;
-                case GLFW_KEY_TAB:
-                    first_person_mode = 1 - first_person_mode;
-                    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
                     break;
             }
         }
@@ -906,6 +880,28 @@ void initParameter() {
     polygon_mode = 0;
 }
 
+void resetTranslations() {
+    if (first_person_mode == 0) {
+        main_camera.position = Vector3(0.0f, 0.0f, 2.0f);
+        main_camera.center = Vector3(0.0f, 0.0f, 0.0f);
+        main_camera.up_vector = Vector3(0.0f, 1.0f, 0.0f);
+    } else if (first_person_mode == 1) {
+        main_camera.position = Vector3(0.0f, 0.0f, 2.0f);
+        main_camera.center = Vector3(0.0f, 0.0f, 1.0f);
+        main_camera.up_vector = Vector3(0.0f, 1.0f, 0.0f);
+    }
+    setViewingMatrix();
+    setPerspective();  // set default projection matrix as perspective matrix
+
+    polygon_mode = 0;
+
+    for (auto& model : models) {
+        model.position = Vector3(0, 0, 0);
+        model.scale = Vector3(1, 1, 1);
+        model.rotation = Vector3(0, 0, 0);
+    }
+}
+
 void setupRC() {
     // setup shaders
     setShaders();
@@ -917,16 +913,6 @@ void setupRC() {
     // [TODO] Load five model at here
     for (auto model : model_list)
         loadModels(model);
-}
-
-void resetModelsAndParameters() {
-    initParameter();
-
-    for (auto& model : models) {
-        model.position = Vector3(0, 0, 0);
-        model.scale = Vector3(1, 1, 1);
-        model.rotation = Vector3(0, 0, 0);
-    }
 }
 
 void glPrintContextInfo(bool printExtension) {
