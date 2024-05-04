@@ -357,7 +357,7 @@ void drawPlane() {
 void movement() {
     Vector3 front_vector = (main_camera.center - main_camera.position).normalize();
     Vector3 right_vector = front_vector.cross(main_camera.up_vector).normalize();
-    Vector3 up_vector = right_vector.cross(front_vector).normalize();
+    Vector3 up_vector = Vector3(0, 1, 0);
     Vector3 direction;
 
     if (key_status_list[GLFW_KEY_W]) {
