@@ -27,8 +27,8 @@ const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 800;
 
 bool mouse_pressed = false;
-int starting_press_x = -1;
-int starting_press_y = -1;
+double starting_press_x = 0.0f;
+double starting_press_y = 0.0f;
 
 Uniform uniform;
 vector<string> filenames;  // .obj filename list
@@ -40,6 +40,8 @@ Matrix4 view_matrix;
 Matrix4 project_matrix;
 
 int cur_idx = 0;  // represent which model should be rendered now
+int window_width = WINDOW_WIDTH;
+int window_height = WINDOW_HEIGHT;
 
 Matrix4 translate(Vector3 vec);
 Matrix4 scaling(Vector3 vec);
@@ -63,65 +65,55 @@ void setupRC();
 // [TODO] given a translation vector then output a Matrix4 (Translation Matrix)
 Matrix4 translate(Vector3 vec) {
     Matrix4 mat;
-
-    /*
     mat = Matrix4(
-            ...
-    );
-    */
-
+        1.0f, 0.0f, 0.0f, vec.x,
+        0.0f, 1.0f, 0.0f, vec.y,
+        0.0f, 0.0f, 1.0f, vec.z,
+        0.0f, 0.0f, 0.0f, 1.0f);
     return mat;
 }
 
 // [TODO] given a scaling vector then output a Matrix4 (Scaling Matrix)
 Matrix4 scaling(Vector3 vec) {
     Matrix4 mat;
-
-    /*
     mat = Matrix4(
-            ...
-    );
-    */
-
+        vec.x, 0.0f, 0.0f, 0.0f,
+        0.0f, vec.y, 0.0f, 0.0f,
+        0.0f, 0.0f, vec.z, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f);
     return mat;
 }
 
 // [TODO] given a float value then ouput a rotation matrix alone axis-X (rotate alone axis-X)
 Matrix4 rotateX(GLfloat val) {
     Matrix4 mat;
-
-    /*
     mat = Matrix4(
-            ...
-    );
-    */
-
+        1.0f, 0.0f, 0.0f, 0.0f,
+        0.0f, cos(val), -sin(val), 0.0f,
+        0.0f, sin(val), cos(val), 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f);
     return mat;
 }
 
 // [TODO] given a float value then ouput a rotation matrix alone axis-Y (rotate alone axis-Y)
 Matrix4 rotateY(GLfloat val) {
     Matrix4 mat;
-
-    /*
     mat = Matrix4(
-            ...
-    );
-    */
-
+        cos(val), 0.0f, sin(val), 0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        -sin(val), 0.0f, cos(val), 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f);
     return mat;
 }
 
 // [TODO] given a float value then ouput a rotation matrix alone axis-Z (rotate alone axis-Z)
 Matrix4 rotateZ(GLfloat val) {
     Matrix4 mat;
-
-    /*
     mat = Matrix4(
-            ...
-    );
-    */
-
+        cos(val), -sin(val), 0.0f, 0.0f,
+        sin(val), cos(val), 0.0f, 0.0f,
+        0.0f, 0.0f, 1.0f, 0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f);
     return mat;
 }
 
@@ -131,13 +123,63 @@ Matrix4 rotate(Vector3 vec) {
 
 // [TODO] compute viewing matrix accroding to the setting of main_camera
 void setViewingMatrix() {
-    // view_matrix[...] = ...
+    Vector3 p_c = main_camera.center - main_camera.position;
+    Vector3 p_u = main_camera.up_vector;
+    Vector3 rx = p_c.cross(p_u) / (p_c.cross(p_u)).length();
+    Vector3 rz = -p_c / p_c.length();
+    Vector3 ry = rz.cross(rx);
+
+    view_matrix =
+        Matrix4(
+            rx.x, rx.y, rx.z, 0.0f,
+            ry.x, ry.y, ry.z, 0.0f,
+            rz.x, rz.y, rz.z, 0.0f,
+            0.0f, 0.0f, 0.0f, 1.0f) *
+        Matrix4(
+            1.0f, 0.0f, 0.0f, -main_camera.position.x,
+            0.0f, 1.0f, 0.0f, -main_camera.position.y,
+            0.0f, 0.0f, 1.0f, -main_camera.position.z,
+            0.0f, 0.0f, 0.0f, 1.0f);
 }
 
 // [TODO] compute persepective projection matrix
 void setPerspective() {
-    // GLfloat f = ...
-    // project_matrix [...] = ...
+    float fovy = proj.fovy / 180.0 * M_PI / 2.0;
+    float half_height = proj.nearClip * tan(fovy);
+    float half_width = half_height * proj.aspect;
+
+    float x_min = -half_width;
+    float x_max = half_width;
+    float y_min = -half_height;
+    float y_max = half_height;
+    float z_near = proj.nearClip;
+    float z_far = proj.farClip;
+
+    float x_diff = x_max - x_min;
+    float x_sum = x_max + x_min;
+    float y_diff = y_max - y_min;
+    float y_sum = y_max + y_min;
+    float z_diff = z_far - z_near;
+    float z_sum = z_far + z_near;
+    float z_mult = z_far * z_near;
+
+    // Derived from
+    // project_matrix =
+    //     Matrix4(
+    //         2.0f / x_diff, 0.0f, 0.0f, -x_sum / x_diff,
+    //         0.0f, 2.0f / y_diff, 0.0f, -y_sum / y_diff,
+    //         0.0f, 0.0f, 2.0f / z_diff, -z_sum / z_diff,
+    //         0.0f, 0.0f, 0.0f, 1.0f) *
+    //     Matrix4(
+    //         z_near, 0.0f, 0.0f, 0.0f,
+    //         0.0f, z_near, 0.0f, 0.0f,
+    //         0.0f, 0.0f, -z_sum, -z_mult, // Modded
+    //         0.0f, 0.0f, -1.0f, 0.0f); // Modded
+    project_matrix = Matrix4(
+        2.0f * proj.nearClip / x_diff, 0.0f, -x_sum / x_diff, 0.0f,
+        0.0f, 2.0f * proj.nearClip / y_diff, -y_sum / y_diff, 0.0f,
+        0.0f, 0.0f, -z_sum / z_diff, -2.0f * z_mult / z_diff,
+        0.0f, 0.0f, -1.0f, 0.0f);
 }
 
 void setGLMatrix(GLfloat* glm, Matrix4& m) {
@@ -166,6 +208,10 @@ GLuint VAO, VBO;
 void changeSize(GLFWwindow* window, int width, int height) {
     glViewport(0, 0, width, height);
     // [TODO] change your aspect ratio
+    window_width = width;
+    window_height = height;
+    proj.aspect = (float)window_width / (float)window_height;
+    setPerspective();
 }
 
 // Render function for display rendering
@@ -175,16 +221,20 @@ void renderScene(void) {
 
     Matrix4 T, R, S;
     // [TODO] update translation, rotation and scaling
+    T = translate(models[cur_idx].position);
+    R = rotate(models[cur_idx].rotation);
+    S = scaling(models[cur_idx].scale);
 
     Matrix4 MVP;
-    GLfloat mvp[16];
+    // GLfloat mvp[16];
 
     // [TODO] multiply all the matrix
     // row-major ---> column-major
-    setGLMatrix(mvp, MVP);
+    // setGLMatrix(mvp, MVP);
+    MVP = project_matrix * view_matrix * T * R * S;
 
     // use uniform to send mvp to vertex shader
-    glUniformMatrix4fv(uniform.iLocMVP, 1, GL_FALSE, mvp);
+    glUniformMatrix4fv(uniform.iLocMVP, 1, GL_TRUE, MVP.get());
     for (int i = 0; i < models[cur_idx].shapes.size(); i++) {
         // set glViewport and draw twice ...
         glBindVertexArray(models[cur_idx].shapes[i].vao);
@@ -193,19 +243,96 @@ void renderScene(void) {
 }
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    // [TODO] Call back function for keyboard
+    // [TODO] Call back function for keyboardif (action == GLFW_PRESS) {
+    if (action == GLFW_PRESS) {
+        switch (key) {
+            case GLFW_KEY_ESCAPE:
+                glfwSetWindowShouldClose(window, true);
+                break;
+            case GLFW_KEY_I:
+                std::cout << "Matrix Value:\n"
+                          << "Viewing Matrix:\n"
+                          << view_matrix << "\n"
+                          << "Projection Matrix:\n"
+                          << project_matrix << "\n"
+                          << "Translation Matrix:\n"
+                          << translate(models[cur_idx].position) << "\n"
+                          << "Rotation Matrix:\n"
+                          << rotate(models[cur_idx].rotation) << "\n"
+                          << "Scaling Matrix:\n"
+                          << scaling(models[cur_idx].scale) << "\n";
+                break;
+            case GLFW_KEY_Z:
+                cur_idx = (cur_idx + int(models.size()) - 1) % int(models.size());
+                break;
+            case GLFW_KEY_X:
+                cur_idx = (cur_idx + 1) % int(models.size());
+                break;
+            case GLFW_KEY_T:
+                cur_trans_mode = GeoTranslation;
+                break;
+            case GLFW_KEY_S:
+                cur_trans_mode = GeoScaling;
+                break;
+            case GLFW_KEY_R:
+                cur_trans_mode = GeoRotation;
+                break;
+        }
+    }
 }
 
 void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
     // [TODO] scroll up positive, otherwise it would be negtive
+    switch (cur_trans_mode) {
+        case GeoTranslation:
+            models[cur_idx].position.z += yoffset / 20;
+            break;
+        case GeoScaling:
+            models[cur_idx].scale.z += yoffset / 20;
+            break;
+        case GeoRotation:
+            models[cur_idx].rotation.z += yoffset / 20;
+            break;
+    }
 }
 
 void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
     // [TODO] mouse press callback function
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+        double xpos, ypos;
+        glfwGetCursorPos(window, &xpos, &ypos);
+        mouse_pressed = true;
+        starting_press_x = xpos;
+        starting_press_y = ypos;
+    } else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
+        mouse_pressed = false;
+    }
 }
 
 void cursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
     // [TODO] cursor position callback function
+    switch (cur_trans_mode) {
+        case GeoTranslation:
+            if (mouse_pressed) {
+                models[cur_idx].position.x += (xpos - starting_press_x) / 100;
+                models[cur_idx].position.y -= (ypos - starting_press_y) / 100;
+            }
+            break;
+        case GeoScaling:
+            if (mouse_pressed) {
+                models[cur_idx].scale.x += (xpos - starting_press_x) / 100;
+                models[cur_idx].scale.y -= (ypos - starting_press_y) / 100;
+            }
+            break;
+        case GeoRotation:
+            if (mouse_pressed) {
+                models[cur_idx].rotation.x += (ypos - starting_press_y) / 100;
+                models[cur_idx].rotation.y += (xpos - starting_press_x) / 100;
+            }
+            break;
+    }
+    starting_press_x = xpos;
+    starting_press_y = ypos;
 }
 
 void setShaders() {
@@ -286,7 +413,7 @@ void initParameter() {
     proj.nearClip = 0.001;
     proj.farClip = 100.0;
     proj.fovy = 80;
-    proj.aspect = (float)WINDOW_WIDTH / (float)WINDOW_HEIGHT;
+    proj.aspect = (float)window_width / (float)window_height;
 
     main_camera.position = Vector3(0.0f, 0.0f, 2.0f);
     main_camera.center = Vector3(0.0f, 0.0f, 0.0f);
@@ -294,6 +421,8 @@ void initParameter() {
 
     setViewingMatrix();
     setPerspective();  // set default projection matrix as perspective matrix
+
+    cur_idx = 0;
 }
 
 void setupRC() {
@@ -305,9 +434,11 @@ void setupRC() {
     glClearColor(0.2, 0.2, 0.2, 1.0);
     vector<string> model_list{"../NormalModels/bunny5KN.obj", "../NormalModels/dragon10KN.obj", "../NormalModels/lucy25KN.obj", "../NormalModels/teapot4KN.obj", "../NormalModels/dolphinN.obj"};
     // [TODO] Load five model at here
-    model tmp_model;
-    loadModel(model_list[cur_idx], tmp_model);
-    models.push_back(tmp_model);
+    for (int i = 0; i < model_list.size(); i++) {
+        model tmp_model;
+        loadModel(model_list[i], tmp_model);
+        models.push_back(tmp_model);
+    }
 }
 
 int main(int argc, char** argv) {
@@ -322,7 +453,7 @@ int main(int argc, char** argv) {
 #endif
 
     // create window
-    GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Student ID HW2", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "109062131 HW2", NULL, NULL);
     if (window == NULL) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
