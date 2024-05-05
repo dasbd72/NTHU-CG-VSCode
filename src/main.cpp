@@ -206,18 +206,21 @@ GLuint VAO, VBO;
 
 // Call back function for window reshape
 void changeSize(GLFWwindow* window, int width, int height) {
-    glViewport(0, 0, width, height);
     // [TODO] change your aspect ratio
     window_width = width;
     window_height = height;
-    proj.aspect = (float)window_width / (float)window_height;
-    setPerspective();
 }
 
 // Render function for display rendering
 void renderScene(void) {
     // clear canvas
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+    GLfloat curr_aspect = (float)window_width / (int)models[cur_idx].shapes.size() / (float)window_height;
+    if (proj.aspect != curr_aspect) {
+        proj.aspect = curr_aspect;
+        setPerspective();
+    }
 
     Matrix4 T, R, S;
     // [TODO] update translation, rotation and scaling
@@ -235,8 +238,12 @@ void renderScene(void) {
 
     // use uniform to send mvp to vertex shader
     glUniformMatrix4fv(uniform.iLocMVP, 1, GL_TRUE, MVP.get());
-    for (int i = 0; i < models[cur_idx].shapes.size(); i++) {
+    int n_shapes = models[cur_idx].shapes.size();
+    for (int i = 0; i < n_shapes; i++) {
         // set glViewport and draw twice ...
+        int frame_width, frame_height;
+        glfwGetFramebufferSize(glfwGetCurrentContext(), &frame_width, &frame_height);
+        glViewport(i * frame_width / n_shapes, 0, frame_width / n_shapes, frame_height);
         glBindVertexArray(models[cur_idx].shapes[i].vao);
         glDrawArrays(GL_TRIANGLES, 0, models[cur_idx].shapes[i].vertex_count);
     }

@@ -217,6 +217,7 @@ void loadModel(std::string model_path, model& model) {
         if (allMaterial.size() > 0)
             tmp_shape.material = allMaterial[shapes[i].mesh.material_ids[0]];
         model.shapes.push_back(tmp_shape);
+        model.shapes.push_back(tmp_shape);
     }
     shapes.clear();
     materials.clear();
