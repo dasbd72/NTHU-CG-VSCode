@@ -216,7 +216,7 @@ void renderScene(void) {
     // clear canvas
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-    GLfloat curr_aspect = (float)window_width / (int)models[cur_idx].shapes.size() / (float)window_height;
+    GLfloat curr_aspect = (float)window_width / 2.0 / (float)window_height;
     if (proj.aspect != curr_aspect) {
         proj.aspect = curr_aspect;
         setPerspective();
@@ -238,14 +238,14 @@ void renderScene(void) {
 
     // use uniform to send mvp to vertex shader
     glUniformMatrix4fv(uniform.iLocMVP, 1, GL_TRUE, MVP.get());
-    int n_shapes = models[cur_idx].shapes.size();
-    for (int i = 0; i < n_shapes; i++) {
-        // set glViewport and draw twice ...
+    for (int side = 0; side < 2; side++) {
         int frame_width, frame_height;
         glfwGetFramebufferSize(glfwGetCurrentContext(), &frame_width, &frame_height);
-        glViewport(i * frame_width / n_shapes, 0, frame_width / n_shapes, frame_height);
-        glBindVertexArray(models[cur_idx].shapes[i].vao);
-        glDrawArrays(GL_TRIANGLES, 0, models[cur_idx].shapes[i].vertex_count);
+        glViewport(side * frame_width / 2.0f, 0, frame_width / 2.0f, frame_height);
+        for (int i = 0; i < (int)models[cur_idx].shapes.size(); i++) {
+            glBindVertexArray(models[cur_idx].shapes[i].vao);
+            glDrawArrays(GL_TRIANGLES, 0, models[cur_idx].shapes[i].vertex_count);
+        }
     }
 }
 
