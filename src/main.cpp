@@ -33,6 +33,9 @@ int screenWidth = WINDOW_WIDTH, screenHeight = WINDOW_HEIGHT;
 bool mouse_pressed = false;
 int starting_press_x = -1;
 int starting_press_y = -1;
+// program location
+GLuint program;
+Uniform uniform;
 vector<string> filenames;  // .obj filename list
 vector<Model> models;
 Camera main_camera;
@@ -45,13 +48,6 @@ Shape m_shpae;
 
 int cur_idx = 0;  // represent which model should be rendered now
 vector<string> model_list{"../TextureModels/Fushigidane.obj", "../TextureModels/Mew.obj", "../TextureModels/Nyarth.obj", "../TextureModels/Zenigame.obj", "../TextureModels/laurana500.obj", "../TextureModels/Nala.obj", "../TextureModels/Square.obj"};
-
-// program location
-GLuint program;
-// uniforms location
-GLuint iLocP;
-GLuint iLocV;
-GLuint iLocM;
 
 Matrix4 translate(Vector3 vec);
 Matrix4 scaling(Vector3 vec);
@@ -243,9 +239,9 @@ void renderScene(int per_vertex_or_per_pixel) {
 
     // render object
     Matrix4 model_matrix = T * R * S;
-    glUniformMatrix4fv(iLocM, 1, GL_FALSE, model_matrix.getTranspose());
-    glUniformMatrix4fv(iLocV, 1, GL_FALSE, view_matrix.getTranspose());
-    glUniformMatrix4fv(iLocP, 1, GL_FALSE, project_matrix.getTranspose());
+    glUniformMatrix4fv(uniform.trans.model, 1, GL_FALSE, model_matrix.getTranspose());
+    glUniformMatrix4fv(uniform.trans.view, 1, GL_FALSE, view_matrix.getTranspose());
+    glUniformMatrix4fv(uniform.trans.projection, 1, GL_FALSE, project_matrix.getTranspose());
 
     for (int i = 0; i < models[cur_idx].shapes.size(); i++) {
         glBindVertexArray(models[cur_idx].shapes[i].vao);
@@ -485,9 +481,9 @@ void initParameter() {
 }
 
 void setUniformVariables() {
-    iLocP = glGetUniformLocation(program, "um4p");
-    iLocV = glGetUniformLocation(program, "um4v");
-    iLocM = glGetUniformLocation(program, "um4m");
+    uniform.trans.model = glGetUniformLocation(program, "trans.model");
+    uniform.trans.view = glGetUniformLocation(program, "trans.view");
+    uniform.trans.projection = glGetUniformLocation(program, "trans.projection");
 
     // [TODO] Get uniform location of texture
 }

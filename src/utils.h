@@ -19,6 +19,15 @@ enum TransMode {
     ViewUp = 5,
 };
 
+struct Uniform {
+    struct Transform {
+        GLint model;
+        GLint view;
+        GLint projection;
+    } trans;
+};
+
+
 typedef struct _Offset {
     GLfloat x;
     GLfloat y;
