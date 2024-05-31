@@ -2,7 +2,7 @@ ARCH=$(shell uname -p)
 CC = gcc
 CXX = g++
 
-INCLUDES = -I$(glfw_inc) -I$(glad_inc) -Iinclude
+INCLUDES = -I$(glfw_inc) -I$(glad_inc) -I$(stb_inc) -Iinclude
 LIBRARIES = -L$(glfw_lib) 
 
 # Replace with your own glfw path
@@ -19,6 +19,10 @@ endif
 # Replace with your own glad path
 glad = modules/glad
 glad_inc = $(glad)/include
+
+# Replace with your own stb path
+stb = modules/stb
+stb_inc = $(stb)/include
 
 CFLAGS = -Wall -O3 $(INCLUDES)
 CXXFLAGS = -Wall -O3 -std=c++17 $(INCLUDES)

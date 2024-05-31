@@ -8,10 +8,12 @@
 #include <string>
 #include <vector>
 
+#include "textfile.h"
+#define STB_IMAGE_IMPLEMENTATION
+#include <STB/stb_image.h>
+
 #include "Matrices.h"
 #include "Vectors.h"
-#include "textfile.h"
-#include "utils.h"
 #define TINYOBJLOADER_IMPLEMENTATION
 #include "tiny_obj_loader.h"
 
@@ -24,97 +26,184 @@ using namespace std;
 
 // Default window size
 const int WINDOW_WIDTH = 800;
-const int WINDOW_HEIGHT = 800;
+const int WINDOW_HEIGHT = 600;
+// current window size
+int screenWidth = WINDOW_WIDTH, screenHeight = WINDOW_HEIGHT;
 
 bool mouse_pressed = false;
-double starting_press_x = 0.0f;
-double starting_press_y = 0.0f;
+int starting_press_x = -1;
+int starting_press_y = -1;
 
-Uniform uniform;
+enum TransMode {
+    GeoTranslation = 0,
+    GeoRotation = 1,
+    GeoScaling = 2,
+    ViewCenter = 3,
+    ViewEye = 4,
+    ViewUp = 5,
+};
+
 vector<string> filenames;  // .obj filename list
+
+typedef struct _Offset {
+    GLfloat x;
+    GLfloat y;
+    /*struct _Offset(GLfloat _x, GLfloat _y) {
+            x = _x;
+            y = _y;
+    };*/
+} Offset;
+
+typedef struct
+{
+    Vector3 Ka;
+    Vector3 Kd;
+    Vector3 Ks;
+
+    GLuint diffuseTexture;
+
+    // eye texture coordinate
+    GLuint isEye;
+    vector<Offset> offsets;
+
+} PhongMaterial;
+
+typedef struct
+{
+    GLuint vao;
+    GLuint vbo;
+    GLuint vboTex;
+    GLuint ebo;
+    GLuint p_color;
+    int vertex_count;
+    GLuint p_normal;
+    GLuint p_texCoord;
+    PhongMaterial material;
+    int indexCount;
+} Shape;
+
+struct model {
+    Vector3 position = Vector3(0, 0, 0);
+    Vector3 scale = Vector3(1, 1, 1);
+    Vector3 rotation = Vector3(0, 0, 0);  // Euler form
+
+    vector<Shape> shapes;
+
+    bool hasEye;
+    GLint max_eye_offset = 7;
+    GLint cur_eye_offset_idx = 0;
+};
 vector<model> models;
+
+struct camera {
+    Vector3 position;
+    Vector3 center;
+    Vector3 up_vector;
+};
 camera main_camera;
+
+struct project_setting {
+    GLfloat nearClip, farClip;
+    GLfloat fovy;
+    GLfloat aspect;
+    GLfloat left, right, top, bottom;
+};
 project_setting proj;
+
+enum ProjMode {
+    Orthogonal = 0,
+    Perspective = 1,
+};
+ProjMode cur_proj_mode = Orthogonal;
 TransMode cur_trans_mode = GeoTranslation;
+
 Matrix4 view_matrix;
 Matrix4 project_matrix;
-Lighting lighting;
+
+Shape m_shpae;
 
 int cur_idx = 0;  // represent which model should be rendered now
-int window_width = WINDOW_WIDTH;
-int window_height = WINDOW_HEIGHT;
+vector<string> model_list{"../TextureModels/Fushigidane.obj", "../TextureModels/Mew.obj", "../TextureModels/Nyarth.obj", "../TextureModels/Zenigame.obj", "../TextureModels/laurana500.obj", "../TextureModels/Nala.obj", "../TextureModels/Square.obj"};
 
-Matrix4 translate(Vector3 vec);
-Matrix4 scaling(Vector3 vec);
-Matrix4 rotateX(GLfloat val);
-Matrix4 rotateY(GLfloat val);
-Matrix4 rotateZ(GLfloat val);
-Matrix4 rotate(Vector3 vec);
-void setViewingMatrix();
-void setPerspective();
-void setGLMatrix(GLfloat* glm, Matrix4& m);
-void changeSize(GLFWwindow* window, int width, int height);
-void renderScene(void);
-void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
-void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
-void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
-void cursorPosCallback(GLFWwindow* window, double xpos, double ypos);
-void setShaders();
-void initParameter();
-void setupRC();
+GLuint program;
 
-// [TODO] given a translation vector then output a Matrix4 (Translation Matrix)
+// uniforms location
+GLuint iLocP;
+GLuint iLocV;
+GLuint iLocM;
+
+static GLvoid Normalize(GLfloat v[3]) {
+    GLfloat l;
+
+    l = (GLfloat)sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+    v[0] /= l;
+    v[1] /= l;
+    v[2] /= l;
+}
+
+static GLvoid Cross(GLfloat u[3], GLfloat v[3], GLfloat n[3]) {
+    n[0] = u[1] * v[2] - u[2] * v[1];
+    n[1] = u[2] * v[0] - u[0] * v[2];
+    n[2] = u[0] * v[1] - u[1] * v[0];
+}
+
 Matrix4 translate(Vector3 vec) {
     Matrix4 mat;
+
     mat = Matrix4(
         1.0f, 0.0f, 0.0f, vec.x,
         0.0f, 1.0f, 0.0f, vec.y,
         0.0f, 0.0f, 1.0f, vec.z,
         0.0f, 0.0f, 0.0f, 1.0f);
+
     return mat;
 }
 
-// [TODO] given a scaling vector then output a Matrix4 (Scaling Matrix)
 Matrix4 scaling(Vector3 vec) {
     Matrix4 mat;
+
     mat = Matrix4(
         vec.x, 0.0f, 0.0f, 0.0f,
         0.0f, vec.y, 0.0f, 0.0f,
         0.0f, 0.0f, vec.z, 0.0f,
         0.0f, 0.0f, 0.0f, 1.0f);
+
     return mat;
 }
 
-// [TODO] given a float value then ouput a rotation matrix alone axis-X (rotate alone axis-X)
 Matrix4 rotateX(GLfloat val) {
     Matrix4 mat;
+
     mat = Matrix4(
         1.0f, 0.0f, 0.0f, 0.0f,
-        0.0f, cos(val), -sin(val), 0.0f,
-        0.0f, sin(val), cos(val), 0.0f,
+        0.0f, cosf(val), -sinf(val), 0.0f,
+        0.0f, sinf(val), cosf(val), 0.0f,
         0.0f, 0.0f, 0.0f, 1.0f);
+
     return mat;
 }
 
-// [TODO] given a float value then ouput a rotation matrix alone axis-Y (rotate alone axis-Y)
 Matrix4 rotateY(GLfloat val) {
     Matrix4 mat;
+
     mat = Matrix4(
-        cos(val), 0.0f, sin(val), 0.0f,
+        cosf(val), 0.0f, sinf(val), 0.0f,
         0.0f, 1.0f, 0.0f, 0.0f,
-        -sin(val), 0.0f, cos(val), 0.0f,
+        -sinf(val), 0.0f, cosf(val), 0.0f,
         0.0f, 0.0f, 0.0f, 1.0f);
+
     return mat;
 }
 
-// [TODO] given a float value then ouput a rotation matrix alone axis-Z (rotate alone axis-Z)
 Matrix4 rotateZ(GLfloat val) {
     Matrix4 mat;
+
     mat = Matrix4(
-        cos(val), -sin(val), 0.0f, 0.0f,
-        sin(val), cos(val), 0.0f, 0.0f,
+        cosf(val), -sinf(val), 0.0f, 0.0f,
+        sinf(val), cosf(val), 0.0f, 0.0f,
         0.0f, 0.0f, 1.0f, 0.0f,
         0.0f, 0.0f, 0.0f, 1.0f);
+
     return mat;
 }
 
@@ -122,197 +211,151 @@ Matrix4 rotate(Vector3 vec) {
     return rotateX(vec.x) * rotateY(vec.y) * rotateZ(vec.z);
 }
 
-// [TODO] compute viewing matrix accroding to the setting of main_camera
 void setViewingMatrix() {
-    Vector3 p_c = main_camera.center - main_camera.position;
-    Vector3 p_u = main_camera.up_vector;
-    Vector3 rx = p_c.cross(p_u) / (p_c.cross(p_u)).length();
-    Vector3 rz = -p_c / p_c.length();
-    Vector3 ry = rz.cross(rx);
+    float F[3] = {main_camera.position.x - main_camera.center.x, main_camera.position.y - main_camera.center.y, main_camera.position.z - main_camera.center.z};
+    float U[3] = {main_camera.up_vector.x, main_camera.up_vector.y, main_camera.up_vector.z};
+    float R[3];
+    Normalize(F);
+    Cross(U, F, R);
+    Normalize(R);
+    Cross(F, R, U);
+    Normalize(U);
 
-    view_matrix =
-        Matrix4(
-            rx.x, rx.y, rx.z, 0.0f,
-            ry.x, ry.y, ry.z, 0.0f,
-            rz.x, rz.y, rz.z, 0.0f,
-            0.0f, 0.0f, 0.0f, 1.0f) *
-        Matrix4(
-            1.0f, 0.0f, 0.0f, -main_camera.position.x,
-            0.0f, 1.0f, 0.0f, -main_camera.position.y,
-            0.0f, 0.0f, 1.0f, -main_camera.position.z,
-            0.0f, 0.0f, 0.0f, 1.0f);
+    view_matrix[0] = R[0];
+    view_matrix[1] = R[1];
+    view_matrix[2] = R[2];
+    view_matrix[3] = 0;
+    view_matrix[4] = U[0];
+    view_matrix[5] = U[1];
+    view_matrix[6] = U[2];
+    view_matrix[7] = 0;
+    view_matrix[8] = F[0];
+    view_matrix[9] = F[1];
+    view_matrix[10] = F[2];
+    view_matrix[11] = 0;
+    view_matrix[12] = 0;
+    view_matrix[13] = 0;
+    view_matrix[14] = 0;
+    view_matrix[15] = 1;
+
+    view_matrix = view_matrix * translate(-main_camera.position);
 }
 
-// [TODO] compute persepective projection matrix
+void setOrthogonal() {
+    cur_proj_mode = Orthogonal;
+    // handle side by side view
+    float right = proj.right / 2;
+    float left = proj.left / 2;
+    project_matrix[0] = 2 / (right - left);
+    project_matrix[1] = 0;
+    project_matrix[2] = 0;
+    project_matrix[3] = -(right + left) / (right - left);
+    project_matrix[4] = 0;
+    project_matrix[5] = 2 / (proj.top - proj.bottom);
+    project_matrix[6] = 0;
+    project_matrix[7] = -(proj.top + proj.bottom) / (proj.top - proj.bottom);
+    project_matrix[8] = 0;
+    project_matrix[9] = 0;
+    project_matrix[10] = -2 / (proj.farClip - proj.nearClip);
+    project_matrix[11] = -(proj.farClip + proj.nearClip) / (proj.farClip - proj.nearClip);
+    project_matrix[12] = 0;
+    project_matrix[13] = 0;
+    project_matrix[14] = 0;
+    project_matrix[15] = 1;
+}
+
 void setPerspective() {
-    float fovy = proj.fovy / 180.0 * M_PI / 2.0;
-    float half_height = proj.nearClip * tan(fovy);
-    float half_width = half_height * proj.aspect;
+    const float tanHalfFOV = tanf((proj.fovy / 2.0) / 180.0 * acosf(-1.0));
 
-    float x_min = -half_width;
-    float x_max = half_width;
-    float y_min = -half_height;
-    float y_max = half_height;
-    float z_near = proj.nearClip;
-    float z_far = proj.farClip;
-
-    float x_diff = x_max - x_min;
-    float x_sum = x_max + x_min;
-    float y_diff = y_max - y_min;
-    float y_sum = y_max + y_min;
-    float z_diff = z_far - z_near;
-    float z_sum = z_far + z_near;
-    float z_mult = z_far * z_near;
-
-    // Derived from
-    // project_matrix =
-    //     Matrix4(
-    //         2.0f / x_diff, 0.0f, 0.0f, -x_sum / x_diff,
-    //         0.0f, 2.0f / y_diff, 0.0f, -y_sum / y_diff,
-    //         0.0f, 0.0f, 2.0f / z_diff, -z_sum / z_diff,
-    //         0.0f, 0.0f, 0.0f, 1.0f) *
-    //     Matrix4(
-    //         z_near, 0.0f, 0.0f, 0.0f,
-    //         0.0f, z_near, 0.0f, 0.0f,
-    //         0.0f, 0.0f, -z_sum, -z_mult, // Modded
-    //         0.0f, 0.0f, -1.0f, 0.0f); // Modded
-    project_matrix = Matrix4(
-        2.0f * proj.nearClip / x_diff, 0.0f, -x_sum / x_diff, 0.0f,
-        0.0f, 2.0f * proj.nearClip / y_diff, -y_sum / y_diff, 0.0f,
-        0.0f, 0.0f, -z_sum / z_diff, -2.0f * z_mult / z_diff,
-        0.0f, 0.0f, -1.0f, 0.0f);
+    cur_proj_mode = Perspective;
+    project_matrix[0] = 1.0f / (tanHalfFOV * proj.aspect);
+    project_matrix[1] = 0;
+    project_matrix[2] = 0;
+    project_matrix[3] = 0;
+    project_matrix[4] = 0;
+    project_matrix[5] = 1.0f / tanHalfFOV;
+    project_matrix[6] = 0;
+    project_matrix[7] = 0;
+    project_matrix[8] = 0;
+    project_matrix[9] = 0;
+    project_matrix[10] = -(proj.farClip + proj.nearClip) / (proj.farClip - proj.nearClip);
+    project_matrix[11] = -(2 * proj.farClip * proj.nearClip) / (proj.farClip - proj.nearClip);
+    project_matrix[12] = 0;
+    project_matrix[13] = 0;
+    project_matrix[14] = -1;
+    project_matrix[15] = 0;
 }
-
-void setGLMatrix(GLfloat* glm, Matrix4& m) {
-    glm[0] = m[0];
-    glm[4] = m[1];
-    glm[8] = m[2];
-    glm[12] = m[3];
-    glm[1] = m[4];
-    glm[5] = m[5];
-    glm[9] = m[6];
-    glm[13] = m[7];
-    glm[2] = m[8];
-    glm[6] = m[9];
-    glm[10] = m[10];
-    glm[14] = m[11];
-    glm[3] = m[12];
-    glm[7] = m[13];
-    glm[11] = m[14];
-    glm[15] = m[15];
-}
-
-// Vertex buffers
-GLuint VAO, VBO;
 
 // Call back function for window reshape
-void changeSize(GLFWwindow* window, int width, int height) {
-    // [TODO] change your aspect ratio
-    window_width = width;
-    window_height = height;
-}
-
-// Render function for display rendering
-void renderScene(void) {
-    // clear canvas
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-
-    GLfloat curr_aspect = (float)window_width / 2.0 / (float)window_height;
-    if (proj.aspect != curr_aspect) {
-        proj.aspect = curr_aspect;
+void ChangeSize(GLFWwindow* window, int width, int height) {
+    // glViewport(0, 0, width, height);
+    proj.aspect = (float)(width / 2) / (float)height;
+    if (cur_proj_mode == Perspective) {
         setPerspective();
     }
 
-    Matrix4 T, R, S, M;
-    // [TODO] update translation, rotation and scaling
+    screenWidth = width;
+    screenHeight = height;
+}
+
+void Vector3ToFloat4(Vector3 v, GLfloat res[4]) {
+    res[0] = v.x;
+    res[1] = v.y;
+    res[2] = v.z;
+    res[3] = 1;
+}
+
+// Render function for display rendering
+void RenderScene(int per_vertex_or_per_pixel) {
+    Vector3 modelPos = models[cur_idx].position;
+
+    Matrix4 T, R, S;
     T = translate(models[cur_idx].position);
     R = rotate(models[cur_idx].rotation);
     S = scaling(models[cur_idx].scale);
-    M = T * R * S;
 
-    // GLfloat mvp[16];
+    // render object
+    Matrix4 model_matrix = T * R * S;
+    glUniformMatrix4fv(iLocM, 1, GL_FALSE, model_matrix.getTranspose());
+    glUniformMatrix4fv(iLocV, 1, GL_FALSE, view_matrix.getTranspose());
+    glUniformMatrix4fv(iLocP, 1, GL_FALSE, project_matrix.getTranspose());
 
-    // [TODO] multiply all the matrix
-    // row-major ---> column-major
-    // setGLMatrix(mvp, MVP);
+    for (int i = 0; i < models[cur_idx].shapes.size(); i++) {
+        glBindVertexArray(models[cur_idx].shapes[i].vao);
 
-    // use uniform to send mvp to vertex shader
-    glUniformMatrix4fv(uniform.trans.model, 1, GL_TRUE, M.get());
-    glUniformMatrix4fv(uniform.trans.view, 1, GL_TRUE, view_matrix.get());
-    glUniformMatrix4fv(uniform.trans.projection, 1, GL_TRUE, project_matrix.get());
+        // [TODO] Bind texture and modify texture filtering & wrapping mode
+        // Hint: glActiveTexture, glBindTexture, glTexParameteri
 
-    if (lighting.light_mode == DirectionalLight) {
-        Vector3 dir = lighting.dir_light.center - lighting.dir_light.position;
-        glUniform3fv(uniform.dir_light.direction, 1, &dir.x);
-        glUniform3fv(uniform.dir_light.ambient, 1, &lighting.dir_light.ambient.x);
-        glUniform3fv(uniform.dir_light.diffuse, 1, &lighting.dir_light.diffuse.x);
-        glUniform3fv(uniform.dir_light.specular, 1, &lighting.dir_light.specular.x);
-    }
-    if (lighting.light_mode == PointLight) {
-        glUniform3fv(uniform.point_light.position, 1, &lighting.point_light.position.x);
-        glUniform3fv(uniform.point_light.ambient, 1, &lighting.point_light.ambient.x);
-        glUniform3fv(uniform.point_light.diffuse, 1, &lighting.point_light.diffuse.x);
-        glUniform3fv(uniform.point_light.specular, 1, &lighting.point_light.specular.x);
-        for (int i = 0; i < sizeof(uniform.point_light.attenuation_coefficient) / sizeof(uniform.point_light.attenuation_coefficient[0]); i++) {
-            glUniform1f(uniform.point_light.attenuation_coefficient[i], lighting.point_light.attenuation_coefficient[i]);
-        }
-    } else if (lighting.light_mode == SpotlightLight) {
-        glUniform3fv(uniform.spot_light.position, 1, &lighting.spot_light.position.x);
-        glUniform3fv(uniform.spot_light.direction, 1, &lighting.spot_light.direction.x);
-        glUniform3fv(uniform.spot_light.ambient, 1, &lighting.spot_light.ambient.x);
-        glUniform3fv(uniform.spot_light.diffuse, 1, &lighting.spot_light.diffuse.x);
-        glUniform3fv(uniform.spot_light.specular, 1, &lighting.spot_light.specular.x);
-        for (int i = 0; i < sizeof(uniform.spot_light.attenuation_coefficient) / sizeof(uniform.spot_light.attenuation_coefficient[0]); i++) {
-            glUniform1f(uniform.spot_light.attenuation_coefficient[i], lighting.spot_light.attenuation_coefficient[i]);
-        }
-        glUniform1f(uniform.spot_light.exponent, lighting.spot_light.exponent);
-        glUniform1f(uniform.spot_light.cutoff_angle, lighting.spot_light.cutoff_angle);
-    }
-    glUniform3fv(uniform.camera_pos, 1, &main_camera.position.x);
-    glUniform1i(uniform.light_mode, lighting.light_mode);
-
-    for (int side = 0; side < 2; side++) {
-        int frame_width, frame_height;
-        glfwGetFramebufferSize(glfwGetCurrentContext(), &frame_width, &frame_height);
-        glViewport(side * frame_width / 2.0f, 0, frame_width / 2.0f, frame_height);
-        glUniform1i(uniform.per_fragment, side);
-        for (int i = 0; i < (int)models[cur_idx].shapes.size(); i++) {
-            glUniform3fv(uniform.mat.ambient, 1, &models[cur_idx].shapes[i].material.Ka.x);
-            glUniform3fv(uniform.mat.diffuse, 1, &models[cur_idx].shapes[i].material.Kd.x);
-            glUniform3fv(uniform.mat.specular, 1, &models[cur_idx].shapes[i].material.Ks.x);
-            glUniform1f(uniform.mat.shininess, lighting.shininess);
-
-            glBindVertexArray(models[cur_idx].shapes[i].vao);
-            glDrawArrays(GL_TRIANGLES, 0, models[cur_idx].shapes[i].vertex_count);
-        }
+        glDrawArrays(GL_TRIANGLES, 0, models[cur_idx].shapes[i].vertex_count);
     }
 }
 
-void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-    // [TODO] Call back function for keyboardif (action == GLFW_PRESS) {
+// Call back function for keyboard
+void KeyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (action == GLFW_PRESS) {
         switch (key) {
             case GLFW_KEY_ESCAPE:
-                glfwSetWindowShouldClose(window, true);
-                break;
-            case GLFW_KEY_I:
-                std::cout << "Matrix Value:\n"
-                          << "Viewing Matrix:\n"
-                          << view_matrix << "\n"
-                          << "Projection Matrix:\n"
-                          << project_matrix << "\n"
-                          << "Translation Matrix:\n"
-                          << translate(models[cur_idx].position) << "\n"
-                          << "Rotation Matrix:\n"
-                          << rotate(models[cur_idx].rotation) << "\n"
-                          << "Scaling Matrix:\n"
-                          << scaling(models[cur_idx].scale) << "\n";
+                exit(0);
                 break;
             case GLFW_KEY_Z:
-                cur_idx = (cur_idx + int(models.size()) - 1) % int(models.size());
+                cur_idx = (cur_idx + 1) % model_list.size();
                 break;
             case GLFW_KEY_X:
-                cur_idx = (cur_idx + 1) % int(models.size());
+                cur_idx = (cur_idx - 1 + model_list.size()) % model_list.size();
+                break;
+            case GLFW_KEY_O:
+                if (cur_proj_mode == Perspective) {
+                    proj.farClip -= 3.0f;
+                    setViewingMatrix();
+                    setOrthogonal();
+                }
+                break;
+            case GLFW_KEY_P:
+                if (cur_proj_mode == Orthogonal) {
+                    proj.farClip += 3.0f;
+                    setViewingMatrix();
+                    setPerspective();
+                }
                 break;
             case GLFW_KEY_T:
                 cur_trans_mode = GeoTranslation;
@@ -323,113 +366,108 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
             case GLFW_KEY_R:
                 cur_trans_mode = GeoRotation;
                 break;
-            case GLFW_KEY_L:
-                switch (lighting.light_mode) {
-                    case DirectionalLight:
-                        lighting.light_mode = PointLight;
-                        break;
-                    case PointLight:
-                        lighting.light_mode = SpotlightLight;
-                        break;
-                    case SpotlightLight:
-                        lighting.light_mode = DirectionalLight;
-                        break;
-                    default:
-                        lighting.light_mode = DirectionalLight;
-                        break;
-                }
+            case GLFW_KEY_E:
+                cur_trans_mode = ViewEye;
                 break;
-            case GLFW_KEY_K:
-                cur_trans_mode = LightEdit;
+            case GLFW_KEY_C:
+                cur_trans_mode = ViewCenter;
                 break;
-            case GLFW_KEY_J:
-                cur_trans_mode = ShininessEdit;
+            case GLFW_KEY_U:
+                cur_trans_mode = ViewUp;
+                break;
+            case GLFW_KEY_I:
+                cout << endl;
+                break;
+            default:
                 break;
         }
     }
 }
 
-void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
-    // [TODO] scroll up positive, otherwise it would be negtive
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    // scroll up positive, otherwise it would be negtive
     switch (cur_trans_mode) {
+        case ViewEye:
+            main_camera.position.z -= 0.025 * (float)yoffset;
+            setViewingMatrix();
+            printf("Camera Position = ( %f , %f , %f )\n", main_camera.position.x, main_camera.position.y, main_camera.position.z);
+            break;
+        case ViewCenter:
+            main_camera.center.z += 0.1 * (float)yoffset;
+            setViewingMatrix();
+            printf("Camera Viewing Direction = ( %f , %f , %f )\n", main_camera.center.x, main_camera.center.y, main_camera.center.z);
+            break;
+        case ViewUp:
+            main_camera.up_vector.z += 0.33 * (float)yoffset;
+            setViewingMatrix();
+            printf("Camera Up Vector = ( %f , %f , %f )\n", main_camera.up_vector.x, main_camera.up_vector.y, main_camera.up_vector.z);
+            break;
         case GeoTranslation:
-            models[cur_idx].position.z += yoffset / 20;
+            models[cur_idx].position.z += 0.1 * (float)yoffset;
             break;
         case GeoScaling:
-            models[cur_idx].scale.z += yoffset / 20;
+            models[cur_idx].scale.z += 0.01 * (float)yoffset;
             break;
         case GeoRotation:
-            models[cur_idx].rotation.z += yoffset / 20;
-            break;
-        case LightEdit:
-            if (lighting.light_mode == DirectionalLight || lighting.light_mode == PointLight) {
-                Vector3 delta = Vector3(yoffset / 20, yoffset / 20, yoffset / 20);
-                lighting.dir_light.diffuse += delta;
-                lighting.point_light.diffuse += delta;
-                lighting.spot_light.diffuse += delta;
-            } else if (lighting.light_mode == SpotlightLight) {
-                lighting.spot_light.cutoff_angle += yoffset / 5;
-            }
-            break;
-        case ShininessEdit:
-            lighting.shininess += yoffset;
+            models[cur_idx].rotation.z += (acosf(-1.0f) / 180.0) * 5 * (float)yoffset;
             break;
     }
 }
 
-void mouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
-    // [TODO] mouse press callback function
-    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
-        double xpos, ypos;
-        glfwGetCursorPos(window, &xpos, &ypos);
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
         mouse_pressed = true;
-        starting_press_x = xpos;
-        starting_press_y = ypos;
-    } else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
+    else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE) {
         mouse_pressed = false;
+        starting_press_x = -1;
+        starting_press_y = -1;
     }
 }
 
-void cursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
-    // [TODO] cursor position callback function
-    switch (cur_trans_mode) {
-        case GeoTranslation:
-            if (mouse_pressed) {
-                models[cur_idx].position.x += (xpos - starting_press_x) / 100;
-                models[cur_idx].position.y -= (ypos - starting_press_y) / 100;
+static void cursor_pos_callback(GLFWwindow* window, double xpos, double ypos) {
+    if (mouse_pressed) {
+        if (starting_press_x < 0 || starting_press_y < 0) {
+            starting_press_x = (int)xpos;
+            starting_press_y = (int)ypos;
+        } else {
+            float diff_x = starting_press_x - (int)xpos;
+            float diff_y = starting_press_y - (int)ypos;
+            starting_press_x = (int)xpos;
+            starting_press_y = (int)ypos;
+            switch (cur_trans_mode) {
+                case ViewEye:
+                    main_camera.position.x += diff_x * (1.0 / 400.0);
+                    main_camera.position.y += diff_y * (1.0 / 400.0);
+                    setViewingMatrix();
+                    printf("Camera Position = ( %f , %f , %f )\n", main_camera.position.x, main_camera.position.y, main_camera.position.z);
+                    break;
+                case ViewCenter:
+                    main_camera.center.x += diff_x * (1.0 / 400.0);
+                    main_camera.center.y -= diff_y * (1.0 / 400.0);
+                    setViewingMatrix();
+                    printf("Camera Viewing Direction = ( %f , %f , %f )\n", main_camera.center.x, main_camera.center.y, main_camera.center.z);
+                    break;
+                case ViewUp:
+                    main_camera.up_vector.x += diff_x * 0.1;
+                    main_camera.up_vector.y += diff_y * 0.1;
+                    setViewingMatrix();
+                    printf("Camera Up Vector = ( %f , %f , %f )\n", main_camera.up_vector.x, main_camera.up_vector.y, main_camera.up_vector.z);
+                    break;
+                case GeoTranslation:
+                    models[cur_idx].position.x += -diff_x * (1.0 / 400.0);
+                    models[cur_idx].position.y += diff_y * (1.0 / 400.0);
+                    break;
+                case GeoScaling:
+                    models[cur_idx].scale.x += diff_x * 0.001;
+                    models[cur_idx].scale.y += diff_y * 0.001;
+                    break;
+                case GeoRotation:
+                    models[cur_idx].rotation.x += acosf(-1.0f) / 180.0 * diff_y * (45.0 / 400.0);
+                    models[cur_idx].rotation.y += acosf(-1.0f) / 180.0 * diff_x * (45.0 / 400.0);
+                    break;
             }
-            break;
-        case GeoScaling:
-            if (mouse_pressed) {
-                models[cur_idx].scale.x += (xpos - starting_press_x) / 100;
-                models[cur_idx].scale.y -= (ypos - starting_press_y) / 100;
-            }
-            break;
-        case GeoRotation:
-            if (mouse_pressed) {
-                models[cur_idx].rotation.x += (ypos - starting_press_y) / 100;
-                models[cur_idx].rotation.y += (xpos - starting_press_x) / 100;
-            }
-            break;
-        case LightEdit:
-            if (mouse_pressed) {
-                if (lighting.light_mode == DirectionalLight) {
-                    lighting.dir_light.position.x += (xpos - starting_press_x) / 100;
-                    lighting.dir_light.position.y -= (ypos - starting_press_y) / 100;
-                } else if (lighting.light_mode == PointLight) {
-                    lighting.point_light.position.x += (xpos - starting_press_x) / 100;
-                    lighting.point_light.position.y -= (ypos - starting_press_y) / 100;
-                } else if (lighting.light_mode == SpotlightLight) {
-                    lighting.spot_light.position.x += (xpos - starting_press_x) / 100;
-                    lighting.spot_light.position.y -= (ypos - starting_press_y) / 100;
-                }
-            }
-            break;
-        default:
-            break;
+        }
     }
-    starting_press_x = xpos;
-    starting_press_y = ypos;
 }
 
 void setShaders() {
@@ -440,8 +478,8 @@ void setShaders() {
     v = glCreateShader(GL_VERTEX_SHADER);
     f = glCreateShader(GL_FRAGMENT_SHADER);
 
-    vs = textFileRead("shader.vs");
-    fs = textFileRead("shader.fs");
+    vs = textFileRead("shader.vs.glsl");
+    fs = textFileRead("shader.fs.glsl");
 
     glShaderSource(v, 1, (const GLchar**)&vs, NULL);
     glShaderSource(f, 1, (const GLchar**)&fs, NULL);
@@ -491,53 +529,282 @@ void setShaders() {
     glDeleteShader(v);
     glDeleteShader(f);
 
-    uniform.trans.model = glGetUniformLocation(p, "trans.model");
-    uniform.trans.view = glGetUniformLocation(p, "trans.view");
-    uniform.trans.projection = glGetUniformLocation(p, "trans.projection");
-
-    uniform.mat.ambient = glGetUniformLocation(p, "mat.ambient");
-    uniform.mat.diffuse = glGetUniformLocation(p, "mat.diffuse");
-    uniform.mat.specular = glGetUniformLocation(p, "mat.specular");
-    uniform.mat.shininess = glGetUniformLocation(p, "mat.shininess");
-
-    uniform.dir_light.direction = glGetUniformLocation(p, "dir_light.direction");
-    uniform.dir_light.ambient = glGetUniformLocation(p, "dir_light.ambient");
-    uniform.dir_light.diffuse = glGetUniformLocation(p, "dir_light.diffuse");
-    uniform.dir_light.specular = glGetUniformLocation(p, "dir_light.specular");
-
-    uniform.point_light.position = glGetUniformLocation(p, "point_light.position");
-    uniform.point_light.ambient = glGetUniformLocation(p, "point_light.ambient");
-    uniform.point_light.diffuse = glGetUniformLocation(p, "point_light.diffuse");
-    uniform.point_light.specular = glGetUniformLocation(p, "point_light.specular");
-    for (int i = 0; i < sizeof(uniform.point_light.attenuation_coefficient) / sizeof(uniform.point_light.attenuation_coefficient[0]); i++) {
-        uniform.point_light.attenuation_coefficient[i] = glGetUniformLocation(p, ("point_light.attenuation_coefficient[" + to_string(i) + "]").c_str());
-    }
-
-    uniform.spot_light.position = glGetUniformLocation(p, "spot_light.position");
-    uniform.spot_light.direction = glGetUniformLocation(p, "spot_light.direction");
-    uniform.spot_light.ambient = glGetUniformLocation(p, "spot_light.ambient");
-    uniform.spot_light.diffuse = glGetUniformLocation(p, "spot_light.diffuse");
-    uniform.spot_light.specular = glGetUniformLocation(p, "spot_light.specular");
-    for (int i = 0; i < sizeof(uniform.spot_light.attenuation_coefficient) / sizeof(uniform.spot_light.attenuation_coefficient[0]); i++) {
-        uniform.spot_light.attenuation_coefficient[i] = glGetUniformLocation(p, ("spot_light.attenuation_coefficient[" + to_string(i) + "]").c_str());
-    }
-    uniform.spot_light.cutoff_angle = glGetUniformLocation(p, "spot_light.cutoff_angle");
-    uniform.spot_light.exponent = glGetUniformLocation(p, "spot_light.exponent");
-
-    uniform.camera_pos = glGetUniformLocation(p, "camera_pos");
-    uniform.light_mode = glGetUniformLocation(p, "light_mode");
-    uniform.per_fragment = glGetUniformLocation(p, "per_fragment");
-
     if (success)
         glUseProgram(p);
     else {
         system("pause");
         exit(123);
     }
+
+    program = p;
+}
+
+void normalization(tinyobj::attrib_t* attrib, vector<GLfloat>& vertices, vector<GLfloat>& colors, vector<GLfloat>& normals, vector<GLfloat>& textureCoords, vector<int>& material_id, tinyobj::shape_t* shape) {
+    vector<float> xVector, yVector, zVector;
+    float minX = 10000, maxX = -10000, minY = 10000, maxY = -10000, minZ = 10000, maxZ = -10000;
+
+    // find out min and max value of X, Y and Z axis
+    for (int i = 0; i < attrib->vertices.size(); i++) {
+        // maxs = max(maxs, attrib->vertices.at(i));
+        if (i % 3 == 0) {
+            xVector.push_back(attrib->vertices.at(i));
+
+            if (attrib->vertices.at(i) < minX) {
+                minX = attrib->vertices.at(i);
+            }
+
+            if (attrib->vertices.at(i) > maxX) {
+                maxX = attrib->vertices.at(i);
+            }
+        } else if (i % 3 == 1) {
+            yVector.push_back(attrib->vertices.at(i));
+
+            if (attrib->vertices.at(i) < minY) {
+                minY = attrib->vertices.at(i);
+            }
+
+            if (attrib->vertices.at(i) > maxY) {
+                maxY = attrib->vertices.at(i);
+            }
+        } else if (i % 3 == 2) {
+            zVector.push_back(attrib->vertices.at(i));
+
+            if (attrib->vertices.at(i) < minZ) {
+                minZ = attrib->vertices.at(i);
+            }
+
+            if (attrib->vertices.at(i) > maxZ) {
+                maxZ = attrib->vertices.at(i);
+            }
+        }
+    }
+
+    float offsetX = (maxX + minX) / 2;
+    float offsetY = (maxY + minY) / 2;
+    float offsetZ = (maxZ + minZ) / 2;
+
+    for (int i = 0; i < attrib->vertices.size(); i++) {
+        if (offsetX != 0 && i % 3 == 0) {
+            attrib->vertices.at(i) = attrib->vertices.at(i) - offsetX;
+        } else if (offsetY != 0 && i % 3 == 1) {
+            attrib->vertices.at(i) = attrib->vertices.at(i) - offsetY;
+        } else if (offsetZ != 0 && i % 3 == 2) {
+            attrib->vertices.at(i) = attrib->vertices.at(i) - offsetZ;
+        }
+    }
+
+    float greatestAxis = maxX - minX;
+    float distanceOfYAxis = maxY - minY;
+    float distanceOfZAxis = maxZ - minZ;
+
+    if (distanceOfYAxis > greatestAxis) {
+        greatestAxis = distanceOfYAxis;
+    }
+
+    if (distanceOfZAxis > greatestAxis) {
+        greatestAxis = distanceOfZAxis;
+    }
+
+    float scale = greatestAxis / 2;
+
+    for (int i = 0; i < attrib->vertices.size(); i++) {
+        // std::cout << i << " = " << (double)(attrib.vertices.at(i) / greatestAxis) << std::endl;
+        attrib->vertices.at(i) = attrib->vertices.at(i) / scale;
+    }
+    size_t index_offset = 0;
+    for (size_t f = 0; f < shape->mesh.num_face_vertices.size(); f++) {
+        int fv = shape->mesh.num_face_vertices[f];
+
+        // Loop over vertices in the face.
+        for (size_t v = 0; v < fv; v++) {
+            // access to vertex
+            tinyobj::index_t idx = shape->mesh.indices[index_offset + v];
+            vertices.push_back(attrib->vertices[3 * idx.vertex_index + 0]);
+            vertices.push_back(attrib->vertices[3 * idx.vertex_index + 1]);
+            vertices.push_back(attrib->vertices[3 * idx.vertex_index + 2]);
+            // Optional: vertex colors
+            colors.push_back(attrib->colors[3 * idx.vertex_index + 0]);
+            colors.push_back(attrib->colors[3 * idx.vertex_index + 1]);
+            colors.push_back(attrib->colors[3 * idx.vertex_index + 2]);
+            // Optional: vertex normals
+            normals.push_back(attrib->normals[3 * idx.normal_index + 0]);
+            normals.push_back(attrib->normals[3 * idx.normal_index + 1]);
+            normals.push_back(attrib->normals[3 * idx.normal_index + 2]);
+            // Optional: texture coordinate
+            textureCoords.push_back(attrib->texcoords[2 * idx.texcoord_index + 0]);
+            textureCoords.push_back(attrib->texcoords[2 * idx.texcoord_index + 1]);
+            // The material of this vertex
+            material_id.push_back(shape->mesh.material_ids[f]);
+        }
+        index_offset += fv;
+    }
+}
+
+static string GetBaseDir(const string& filepath) {
+    if (filepath.find_last_of("/\\") != std::string::npos)
+        return filepath.substr(0, filepath.find_last_of("/\\"));
+    return "";
+}
+
+GLuint LoadTextureImage(string image_path) {
+    int channel, width, height;
+    int require_channel = 4;
+    stbi_set_flip_vertically_on_load(true);
+    stbi_uc* data = stbi_load(image_path.c_str(), &width, &height, &channel, require_channel);
+    if (data != NULL) {
+        GLuint tex = 0;
+
+        // [TODO] Bind the image to texture
+        // Hint: glGenTextures, glBindTexture, glTexImage2D, glGenerateMipmap
+
+        // free the image from memory after binding to texture
+        stbi_image_free(data);
+        return tex;
+    } else {
+        cout << "LoadTextureImage: Cannot load image from " << image_path << endl;
+        return -1;
+    }
+}
+
+vector<Shape> SplitShapeByMaterial(vector<GLfloat>& vertices, vector<GLfloat>& colors, vector<GLfloat>& normals, vector<GLfloat>& textureCoords, vector<int>& material_id, vector<PhongMaterial>& materials) {
+    vector<Shape> res;
+    for (int m = 0; m < materials.size(); m++) {
+        vector<GLfloat> m_vertices, m_colors, m_normals, m_textureCoords;
+        for (int v = 0; v < material_id.size(); v++) {
+            // extract all vertices with same material id and create a new shape for it.
+            if (material_id[v] == m) {
+                m_vertices.push_back(vertices[v * 3 + 0]);
+                m_vertices.push_back(vertices[v * 3 + 1]);
+                m_vertices.push_back(vertices[v * 3 + 2]);
+
+                m_colors.push_back(colors[v * 3 + 0]);
+                m_colors.push_back(colors[v * 3 + 1]);
+                m_colors.push_back(colors[v * 3 + 2]);
+
+                m_normals.push_back(normals[v * 3 + 0]);
+                m_normals.push_back(normals[v * 3 + 1]);
+                m_normals.push_back(normals[v * 3 + 2]);
+
+                m_textureCoords.push_back(textureCoords[v * 2 + 0]);
+                m_textureCoords.push_back(textureCoords[v * 2 + 1]);
+            }
+        }
+
+        if (!m_vertices.empty()) {
+            Shape tmp_shape;
+            glGenVertexArrays(1, &tmp_shape.vao);
+            glBindVertexArray(tmp_shape.vao);
+
+            glGenBuffers(1, &tmp_shape.vbo);
+            glBindBuffer(GL_ARRAY_BUFFER, tmp_shape.vbo);
+            glBufferData(GL_ARRAY_BUFFER, m_vertices.size() * sizeof(GL_FLOAT), &m_vertices.at(0), GL_STATIC_DRAW);
+            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+            tmp_shape.vertex_count = m_vertices.size() / 3;
+
+            glGenBuffers(1, &tmp_shape.p_color);
+            glBindBuffer(GL_ARRAY_BUFFER, tmp_shape.p_color);
+            glBufferData(GL_ARRAY_BUFFER, m_colors.size() * sizeof(GL_FLOAT), &m_colors.at(0), GL_STATIC_DRAW);
+            glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+            glGenBuffers(1, &tmp_shape.p_normal);
+            glBindBuffer(GL_ARRAY_BUFFER, tmp_shape.p_normal);
+            glBufferData(GL_ARRAY_BUFFER, m_normals.size() * sizeof(GL_FLOAT), &m_normals.at(0), GL_STATIC_DRAW);
+            glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+            glGenBuffers(1, &tmp_shape.p_texCoord);
+            glBindBuffer(GL_ARRAY_BUFFER, tmp_shape.p_texCoord);
+            glBufferData(GL_ARRAY_BUFFER, m_textureCoords.size() * sizeof(GL_FLOAT), &m_textureCoords.at(0), GL_STATIC_DRAW);
+            glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, 0, 0);
+
+            glEnableVertexAttribArray(0);
+            glEnableVertexAttribArray(1);
+            glEnableVertexAttribArray(2);
+            glEnableVertexAttribArray(3);
+
+            tmp_shape.material = materials[m];
+            res.push_back(tmp_shape);
+        }
+    }
+
+    return res;
+}
+
+void LoadTexturedModels(string model_path) {
+    vector<tinyobj::shape_t> shapes;
+    vector<tinyobj::material_t> materials;
+    tinyobj::attrib_t attrib;
+    vector<GLfloat> vertices;
+    vector<GLfloat> colors;
+    vector<GLfloat> normals;
+    vector<GLfloat> textureCoords;
+    vector<int> material_id;
+
+    string err;
+    string warn;
+
+    string base_dir = GetBaseDir(model_path);  // handle .mtl with relative path
+
+#ifdef _WIN32
+    base_dir += "\\";
+#else
+    base_dir += "/";
+#endif
+
+    bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, model_path.c_str(), base_dir.c_str());
+
+    if (!warn.empty()) {
+        cout << warn << std::endl;
+    }
+
+    if (!err.empty()) {
+        cerr << err << std::endl;
+    }
+
+    if (!ret) {
+        exit(1);
+    }
+
+    printf("Load Models Success ! Shapes size %d Material size %d\n", shapes.size(), materials.size());
+    model tmp_model;
+
+    vector<PhongMaterial> allMaterial;
+    for (int i = 0; i < materials.size(); i++) {
+        PhongMaterial material;
+        material.Ka = Vector3(materials[i].ambient[0], materials[i].ambient[1], materials[i].ambient[2]);
+        material.Kd = Vector3(materials[i].diffuse[0], materials[i].diffuse[1], materials[i].diffuse[2]);
+        material.Ks = Vector3(materials[i].specular[0], materials[i].specular[1], materials[i].specular[2]);
+
+        material.diffuseTexture = LoadTextureImage(base_dir + string(materials[i].diffuse_texname));
+        if (material.diffuseTexture == -1) {
+            cout << "LoadTexturedModels: Fail to load model's material " << i << endl;
+            system("pause");
+        }
+
+        allMaterial.push_back(material);
+    }
+
+    for (int i = 0; i < shapes.size(); i++) {
+        vertices.clear();
+        colors.clear();
+        normals.clear();
+        textureCoords.clear();
+        material_id.clear();
+
+        normalization(&attrib, vertices, colors, normals, textureCoords, material_id, &shapes[i]);
+        // printf("Vertices size: %d", vertices.size() / 3);
+
+        // split current shape into multiple shapes base on material_id.
+        vector<Shape> splitedShapeByMaterial = SplitShapeByMaterial(vertices, colors, normals, textureCoords, material_id, allMaterial);
+
+        // concatenate splited shape to model's shape list
+        tmp_model.shapes.insert(tmp_model.shapes.end(), splitedShapeByMaterial.begin(), splitedShapeByMaterial.end());
+    }
+    shapes.clear();
+    materials.clear();
+    models.push_back(tmp_model);
 }
 
 void initParameter() {
-    // [TODO] Setup some parameters if you need
     proj.left = -1;
     proj.right = 1;
     proj.top = 1;
@@ -545,61 +812,50 @@ void initParameter() {
     proj.nearClip = 0.001;
     proj.farClip = 100.0;
     proj.fovy = 80;
-    proj.aspect = (float)window_width / (float)window_height;
+    proj.aspect = (float)(WINDOW_WIDTH / 2) / (float)WINDOW_HEIGHT;  // adjust width for side by side view
 
     main_camera.position = Vector3(0.0f, 0.0f, 2.0f);
     main_camera.center = Vector3(0.0f, 0.0f, 0.0f);
     main_camera.up_vector = Vector3(0.0f, 1.0f, 0.0f);
 
-    lighting.shininess = 64.0f;
-
-    lighting.dir_light.position = Vector3(1.0f, 1.0f, 1.0f);
-    lighting.dir_light.center = Vector3(0.0f, 0.0f, 0.0f);
-    lighting.dir_light.ambient = Vector3(0.15f, 0.15f, 0.15f);
-    lighting.dir_light.diffuse = Vector3(1.0f, 1.0f, 1.0f);
-    lighting.dir_light.specular = Vector3(1.0f, 1.0f, 1.0f);
-
-    lighting.point_light.position = Vector3(0.0f, 2.0f, 1.0f);
-    lighting.point_light.ambient = Vector3(0.15f, 0.15f, 0.15f);
-    lighting.point_light.diffuse = Vector3(1.0f, 1.0f, 1.0f);
-    lighting.point_light.specular = Vector3(1.0f, 1.0f, 1.0f);
-    lighting.point_light.attenuation_coefficient[0] = 0.01f;
-    lighting.point_light.attenuation_coefficient[1] = 0.8f;
-    lighting.point_light.attenuation_coefficient[2] = 0.1f;
-
-    lighting.spot_light.position = Vector3(0.0f, 0.0f, 0.2f);
-    lighting.spot_light.direction = Vector3(0.0f, 0.0f, -1.0f);
-    lighting.spot_light.ambient = Vector3(0.15f, 0.15f, 0.15f);
-    lighting.spot_light.diffuse = Vector3(1.0f, 1.0f, 1.0f);
-    lighting.spot_light.specular = Vector3(1.0f, 1.0f, 1.0f);
-    lighting.spot_light.attenuation_coefficient[0] = 0.05f;
-    lighting.spot_light.attenuation_coefficient[1] = 0.3f;
-    lighting.spot_light.attenuation_coefficient[2] = 0.6f;
-    lighting.spot_light.exponent = 50.0f;
-    lighting.spot_light.cutoff_angle = 30.0f;
-
-    lighting.light_mode = DirectionalLight;
-
     setViewingMatrix();
     setPerspective();  // set default projection matrix as perspective matrix
+}
 
-    cur_idx = 0;
+void setUniformVariables() {
+    iLocP = glGetUniformLocation(program, "um4p");
+    iLocV = glGetUniformLocation(program, "um4v");
+    iLocM = glGetUniformLocation(program, "um4m");
+
+    // [TODO] Get uniform location of texture
 }
 
 void setupRC() {
     // setup shaders
     setShaders();
     initParameter();
+    setUniformVariables();
 
     // OpenGL States and Values
     glClearColor(0.2, 0.2, 0.2, 1.0);
-    vector<string> model_list{"../NormalModels/bunny5KN.obj", "../NormalModels/dragon10KN.obj", "../NormalModels/lucy25KN.obj", "../NormalModels/teapot4KN.obj", "../NormalModels/dolphinN.obj"};
-    // [TODO] Load five model at here
-    for (int i = 0; i < model_list.size(); i++) {
-        model tmp_model;
-        loadModel(model_list[i], tmp_model);
-        tmp_model.position = Vector3(0, 0, -2);
-        models.push_back(tmp_model);
+
+    for (string model_path : model_list) {
+        LoadTexturedModels(model_path);
+    }
+}
+
+void glPrintContextInfo(bool printExtension) {
+    cout << "GL_VENDOR = " << (const char*)glGetString(GL_VENDOR) << endl;
+    cout << "GL_RENDERER = " << (const char*)glGetString(GL_RENDERER) << endl;
+    cout << "GL_VERSION = " << (const char*)glGetString(GL_VERSION) << endl;
+    cout << "GL_SHADING_LANGUAGE_VERSION = " << (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION) << endl;
+    if (printExtension) {
+        GLint numExt;
+        glGetIntegerv(GL_NUM_EXTENSIONS, &numExt);
+        cout << "GL_EXTENSIONS =" << endl;
+        for (GLint i = 0; i < numExt; i++) {
+            cout << "\t" << (const char*)glGetStringi(GL_EXTENSIONS, i) << endl;
+        }
     }
 }
 
@@ -615,7 +871,7 @@ int main(int argc, char** argv) {
 #endif
 
     // create window
-    GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "109062131 HW2", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2, "Student ID HW3", NULL, NULL);
     if (window == NULL) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
@@ -629,13 +885,15 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    // register glfw callback functions
-    glfwSetKeyCallback(window, keyCallback);
-    glfwSetScrollCallback(window, scrollCallback);
-    glfwSetMouseButtonCallback(window, mouseButtonCallback);
-    glfwSetCursorPosCallback(window, cursorPosCallback);
+    glPrintContextInfo(false);
 
-    glfwSetFramebufferSizeCallback(window, changeSize);
+    // register glfw callback functions
+    glfwSetKeyCallback(window, KeyCallback);
+    glfwSetScrollCallback(window, scroll_callback);
+    glfwSetMouseButtonCallback(window, mouse_button_callback);
+    glfwSetCursorPosCallback(window, cursor_pos_callback);
+
+    glfwSetFramebufferSizeCallback(window, ChangeSize);
     glEnable(GL_DEPTH_TEST);
     // Setup render context
     setupRC();
@@ -643,7 +901,13 @@ int main(int argc, char** argv) {
     // main loop
     while (!glfwWindowShouldClose(window)) {
         // render
-        renderScene();
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+        // render left view
+        glViewport(0, 0, screenWidth / 2, screenHeight);
+        RenderScene(1);
+        // render right view
+        glViewport(screenWidth / 2, 0, screenWidth / 2, screenHeight);
+        RenderScene(0);
 
         // swap buffer from back to front
         glfwSwapBuffers(window);

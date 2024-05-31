@@ -10,6 +10,7 @@
         "${workspaceRoot}/include",
         "${workspaceRoot}/modules/glad/include",
         "${workspaceRoot}/modules/glfw-3.4.bin.MACOS/include",
+        "${workspaceRoot}/modules/stb/include",
         "/usr/local/include",
         "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include",
         "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++"
