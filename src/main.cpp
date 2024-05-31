@@ -29,7 +29,7 @@ using namespace std;
 const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 600;
 // current window size
-int screenWidth = WINDOW_WIDTH, screenHeight = WINDOW_HEIGHT;
+int screen_width = WINDOW_WIDTH, screen_height = WINDOW_HEIGHT;
 bool mouse_pressed = false;
 int starting_press_x = -1;
 int starting_press_y = -1;
@@ -44,7 +44,7 @@ ProjMode cur_proj_mode = Orthogonal;
 TransMode cur_trans_mode = GeoTranslation;
 Matrix4 view_matrix;
 Matrix4 project_matrix;
-Shape m_shpae;
+Shape m_shape;
 
 int cur_idx = 0;  // represent which model should be rendered now
 vector<string> model_list{"../TextureModels/Fushigidane.obj", "../TextureModels/Mew.obj", "../TextureModels/Nyarth.obj", "../TextureModels/Zenigame.obj", "../TextureModels/laurana500.obj", "../TextureModels/Nala.obj", "../TextureModels/Square.obj"};
@@ -217,8 +217,8 @@ void changeSize(GLFWwindow* window, int width, int height) {
         setPerspective();
     }
 
-    screenWidth = width;
-    screenHeight = height;
+    screen_width = width;
+    screen_height = height;
 }
 
 void vector3ToFloat4(Vector3 v, GLfloat res[4]) {
@@ -548,10 +548,10 @@ int main(int argc, char** argv) {
         // render
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         // render left view
-        glViewport(0, 0, screenWidth / 2, screenHeight);
+        glViewport(0, 0, screen_width / 2, screen_height);
         renderScene(1);
         // render right view
-        glViewport(screenWidth / 2, 0, screenWidth / 2, screenHeight);
+        glViewport(screen_width / 2, 0, screen_width / 2, screen_height);
         renderScene(0);
 
         // swap buffer from back to front
