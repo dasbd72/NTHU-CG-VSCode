@@ -62,6 +62,7 @@
         "unordered_map": "cpp",
         "variant": "cpp",
         "iterator": "cpp",
-        "memory_resource": "cpp"
+        "memory_resource": "cpp",
+        "execution": "cpp"
     }
 }
