@@ -259,6 +259,7 @@ void loadTexturedModels(std::string model_path, Model& model) {
             std::cout << "LoadTexturedModels: Fail to load model's material " << i << std::endl;
             system("pause");
         }
+        std::cout << "  LoadTexturedModels: Load model's material " << base_dir + std::string(materials[i].diffuse_texname) << " success" << std::endl;
 
         allMaterial.push_back(material);
     }
@@ -275,12 +276,19 @@ void loadTexturedModels(std::string model_path, Model& model) {
 
         // split current shape into multiple shapes base on material_id.
         std::vector<Shape> splitedShapeByMaterial = splitShapeByMaterial(vertices, colors, normals, textureCoords, material_id, allMaterial);
+        std::cout << "  LoadTexturedModels: Load model's shape " << i << " success" << std::endl;
 
         // concatenate splited shape to model's shape list
         model.shapes.insert(model.shapes.end(), splitedShapeByMaterial.begin(), splitedShapeByMaterial.end());
     }
     shapes.clear();
     materials.clear();
+
+    std::cout << "  LoadTexturedModels: " << model.shapes.size() << " shapes created" << std::endl;
+    for (int i = 0; i < model.shapes.size(); i++) {
+        std::cout << "  Shape[" << i << "]: " << model.shapes[i].vertex_count << " vertices" << std::endl;
+        std::cout << "  Shape[" << i << "]: " << model.shapes[i].indexCount << " indices" << std::endl;
+    }
 }
 
 void glPrintContextInfo(bool printExtension) {
