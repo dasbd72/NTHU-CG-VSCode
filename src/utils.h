@@ -93,6 +93,16 @@ enum ProjMode {
     Perspective = 1,
 };
 
+enum MinFilterMode {
+    MinFilterNearest = 0,
+    MinFilterLinear = 1,
+};
+
+enum MagFilterMode {
+    MagFilterNearest = 0,
+    MagFilterLinearMipmapLinear = 1,
+};
+
 GLvoid normalize(GLfloat v[3]);
 GLvoid cross(GLfloat u[3], GLfloat v[3], GLfloat n[3]);
 void normalization(tinyobj::attrib_t* attrib, std::vector<GLfloat>& vertices, std::vector<GLfloat>& colors, std::vector<GLfloat>& normals, std::vector<GLfloat>& textureCoords, std::vector<int>& material_id, tinyobj::shape_t* shape);

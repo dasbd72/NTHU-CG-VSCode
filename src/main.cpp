@@ -42,6 +42,8 @@ Camera main_camera;
 ProjectSetting proj;
 ProjMode cur_proj_mode = Orthogonal;
 TransMode cur_trans_mode = GeoTranslation;
+MagFilterMode mag_filter = MagFilterNearest;
+MinFilterMode min_filter = MinFilterNearest;
 Matrix4 view_matrix;
 Matrix4 project_matrix;
 Shape m_shape;
@@ -250,6 +252,16 @@ void renderScene(int per_vertex_or_per_pixel) {
         // Hint: glActiveTexture, glBindTexture, glTexParameteri
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, models[cur_idx].shapes[i].material.diffuseTexture);
+        if (mag_filter == MagFilterNearest) {
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        } else {
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        }
+        if (min_filter == MinFilterNearest) {
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        } else {
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        }
 
         glDrawArrays(GL_TRIANGLES, 0, models[cur_idx].shapes[i].vertex_count);
     }
@@ -302,6 +314,20 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
                 break;
             case GLFW_KEY_I:
                 cout << endl;
+                break;
+            case GLFW_KEY_G:
+                if (mag_filter == MagFilterNearest) {
+                    mag_filter = MagFilterLinearMipmapLinear;
+                } else {
+                    mag_filter = MagFilterNearest;
+                }
+                break;
+            case GLFW_KEY_B:
+                if (min_filter == MinFilterNearest) {
+                    min_filter = MinFilterLinear;
+                } else {
+                    min_filter = MinFilterNearest;
+                }
                 break;
             default:
                 break;
