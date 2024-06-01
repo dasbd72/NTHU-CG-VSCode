@@ -30,7 +30,7 @@ const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 600;
 
 // current window size
-int screen_width = WINDOW_WIDTH, screen_height = WINDOW_HEIGHT;
+int frame_width, frame_height;
 bool mouse_pressed = false;
 int starting_press_x = -1;
 int starting_press_y = -1;
@@ -225,8 +225,7 @@ void changeSize(GLFWwindow* window, int width, int height) {
         setPerspective();
     }
 
-    screen_width = width;
-    screen_height = height;
+    glfwGetFramebufferSize(window, &frame_width, &frame_height);
 }
 
 void vector3ToFloat4(Vector3 v, GLfloat res[4]) {
@@ -727,13 +726,14 @@ int main(int argc, char** argv) {
 #endif
 
     // create window
-    GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2, "109062131 HW3", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "109062131 HW3", NULL, NULL);
     if (window == NULL) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
         return -1;
     }
     glfwMakeContextCurrent(window);
+    glfwGetFramebufferSize(window, &frame_width, &frame_height);
 
     // load OpenGL function pointer
     if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
@@ -759,10 +759,10 @@ int main(int argc, char** argv) {
         // render
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         // render left view
-        glViewport(0, 0, screen_width / 2, screen_height);
+        glViewport(0, 0, frame_width / 2, frame_height);
         renderScene(1);
         // render right view
-        glViewport(screen_width / 2, 0, screen_width / 2, screen_height);
+        glViewport(frame_width / 2, 0, frame_width / 2, frame_height);
         renderScene(0);
 
         // swap buffer from back to front
