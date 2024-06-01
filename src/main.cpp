@@ -28,28 +28,32 @@ using namespace std;
 // Default window size
 const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 600;
+
 // current window size
 int screen_width = WINDOW_WIDTH, screen_height = WINDOW_HEIGHT;
 bool mouse_pressed = false;
 int starting_press_x = -1;
 int starting_press_y = -1;
-// program location
-GLuint program;
-Uniform uniform;
+int cur_idx = 0;  // represent which model should be rendered now
+vector<string> model_list{"../TextureModels/Fushigidane.obj", "../TextureModels/Mew.obj", "../TextureModels/Nyarth.obj", "../TextureModels/Zenigame.obj", "../TextureModels/laurana500.obj", "../TextureModels/Nala.obj", "../TextureModels/Square.obj"};
 vector<string> filenames;  // .obj filename list
 vector<Model> models;
-Camera main_camera;
-ProjectSetting proj;
+
+// program and uniforms
+GLuint program;
+Uniform uniform;
+
+// Modes
 ProjMode cur_proj_mode = Orthogonal;
 TransMode cur_trans_mode = GeoTranslation;
 MagFilterMode mag_filter = MagFilterNearest;
 MinFilterMode min_filter = MinFilterNearest;
+
 Matrix4 view_matrix;
 Matrix4 project_matrix;
+Camera main_camera;
+ProjectSetting proj;
 Shape m_shape;
-
-int cur_idx = 0;  // represent which model should be rendered now
-vector<string> model_list{"../TextureModels/Fushigidane.obj", "../TextureModels/Mew.obj", "../TextureModels/Nyarth.obj", "../TextureModels/Zenigame.obj", "../TextureModels/laurana500.obj", "../TextureModels/Nala.obj", "../TextureModels/Square.obj"};
 
 Matrix4 translate(Vector3 vec);
 Matrix4 scaling(Vector3 vec);
