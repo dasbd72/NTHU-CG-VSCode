@@ -17,6 +17,8 @@ enum TransMode {
     ViewCenter = 3,
     ViewEye = 4,
     ViewUp = 5,
+    LightEdit = 6,
+    ShininessEdit = 7,
 };
 
 struct Uniform {
@@ -25,6 +27,43 @@ struct Uniform {
         GLint view;
         GLint projection;
     } trans;
+
+    struct Material {
+        GLint ambient;
+        GLint diffuse;
+        GLint specular;
+        GLint shininess;
+    } mat;
+
+    struct DirectionalLight {
+        GLint direction;
+        GLint ambient;
+        GLint diffuse;
+        GLint specular;
+    } dir_light;
+
+    struct PointLight {
+        GLint position;
+        GLint ambient;
+        GLint diffuse;
+        GLint specular;
+        GLint attenuation_coefficient[3];
+    } point_light;
+
+    struct SpotLight {
+        GLint position;
+        GLint direction;
+        GLint ambient;
+        GLint diffuse;
+        GLint specular;
+        GLint attenuation_coefficient[3];
+        GLint exponent;
+        GLint cutoff_angle;
+    } spot_light;
+
+    GLint camera_pos;
+    GLint light_mode;
+    GLint per_fragment;
 };
 
 typedef struct _Offset {
@@ -91,6 +130,46 @@ struct ProjectSetting {
 enum ProjMode {
     Orthogonal = 0,
     Perspective = 1,
+};
+
+enum LightMode {
+    DirectionalLight = 0,
+    PointLight = 1,
+    SpotlightLight = 2,
+};
+
+struct Lighting {
+    GLfloat shininess;
+
+    // Directional Light
+    struct DirectionalLight {
+        Vector3 position;
+        Vector3 center;
+        Vector3 ambient;
+        Vector3 diffuse;
+        Vector3 specular;
+    } dir_light;
+
+    // Point Light
+    struct PointLight {
+        Vector3 position;
+        Vector3 ambient;
+        Vector3 diffuse;
+        Vector3 specular;
+        GLfloat attenuation_coefficient[3];
+    } point_light;
+
+    // Spot Light
+    struct SpotLight {
+        Vector3 position;
+        Vector3 direction;
+        Vector3 ambient;
+        Vector3 diffuse;
+        Vector3 specular;
+        GLfloat attenuation_coefficient[3];
+        GLfloat exponent;
+        GLfloat cutoff_angle;
+    } spot_light;
 };
 
 enum MinFilterMode {

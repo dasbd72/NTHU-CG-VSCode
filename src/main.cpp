@@ -48,12 +48,14 @@ ProjMode cur_proj_mode = Orthogonal;
 TransMode cur_trans_mode = GeoTranslation;
 MagFilterMode mag_filter = MagFilterNearest;
 MinFilterMode min_filter = MinFilterNearest;
+LightMode light_mode = DirectionalLight;
 
 Matrix4 view_matrix;
 Matrix4 project_matrix;
 Camera main_camera;
 ProjectSetting proj;
 Shape m_shape;
+Lighting lighting;
 
 Matrix4 translate(Vector3 vec);
 Matrix4 scaling(Vector3 vec);
@@ -249,7 +251,49 @@ void renderScene(int per_vertex_or_per_pixel) {
     glUniformMatrix4fv(uniform.trans.view, 1, GL_FALSE, view_matrix.getTranspose());
     glUniformMatrix4fv(uniform.trans.projection, 1, GL_FALSE, project_matrix.getTranspose());
 
+    if (light_mode == DirectionalLight) {
+        Vector3 dir = lighting.dir_light.center - lighting.dir_light.position;
+        glUniform3fv(uniform.dir_light.direction, 1, &dir.x);
+        glUniform3fv(uniform.dir_light.ambient, 1, &lighting.dir_light.ambient.x);
+        glUniform3fv(uniform.dir_light.diffuse, 1, &lighting.dir_light.diffuse.x);
+        glUniform3fv(uniform.dir_light.specular, 1, &lighting.dir_light.specular.x);
+    }
+    if (light_mode == PointLight) {
+        glUniform3fv(uniform.point_light.position, 1, &lighting.point_light.position.x);
+        glUniform3fv(uniform.point_light.ambient, 1, &lighting.point_light.ambient.x);
+        glUniform3fv(uniform.point_light.diffuse, 1, &lighting.point_light.diffuse.x);
+        glUniform3fv(uniform.point_light.specular, 1, &lighting.point_light.specular.x);
+        for (int i = 0; i < sizeof(uniform.point_light.attenuation_coefficient) / sizeof(uniform.point_light.attenuation_coefficient[0]); i++) {
+            glUniform1f(uniform.point_light.attenuation_coefficient[i], lighting.point_light.attenuation_coefficient[i]);
+        }
+    } else if (light_mode == SpotlightLight) {
+        glUniform3fv(uniform.spot_light.position, 1, &lighting.spot_light.position.x);
+        glUniform3fv(uniform.spot_light.direction, 1, &lighting.spot_light.direction.x);
+        glUniform3fv(uniform.spot_light.ambient, 1, &lighting.spot_light.ambient.x);
+        glUniform3fv(uniform.spot_light.diffuse, 1, &lighting.spot_light.diffuse.x);
+        glUniform3fv(uniform.spot_light.specular, 1, &lighting.spot_light.specular.x);
+        for (int i = 0; i < sizeof(uniform.spot_light.attenuation_coefficient) / sizeof(uniform.spot_light.attenuation_coefficient[0]); i++) {
+            glUniform1f(uniform.spot_light.attenuation_coefficient[i], lighting.spot_light.attenuation_coefficient[i]);
+        }
+        glUniform1f(uniform.spot_light.exponent, lighting.spot_light.exponent);
+        glUniform1f(uniform.spot_light.cutoff_angle, lighting.spot_light.cutoff_angle);
+    }
+    glUniform3fv(uniform.camera_pos, 1, &main_camera.position.x);
+    glUniform1i(uniform.light_mode, light_mode);
+    if (per_vertex_or_per_pixel == 1) {
+        // Left viewport
+        glUniform1i(uniform.per_fragment, 0);
+    } else {
+        // Right viewport
+        glUniform1i(uniform.per_fragment, 1);
+    }
+
     for (int i = 0; i < models[cur_idx].shapes.size(); i++) {
+        glUniform3fv(uniform.mat.ambient, 1, &models[cur_idx].shapes[i].material.Ka.x);
+        glUniform3fv(uniform.mat.diffuse, 1, &models[cur_idx].shapes[i].material.Kd.x);
+        glUniform3fv(uniform.mat.specular, 1, &models[cur_idx].shapes[i].material.Ks.x);
+        glUniform1f(uniform.mat.shininess, lighting.shininess);
+
         glBindVertexArray(models[cur_idx].shapes[i].vao);
 
         // [TODO] Bind texture and modify texture filtering & wrapping mode
@@ -333,6 +377,28 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
                     min_filter = MinFilterNearest;
                 }
                 break;
+            case GLFW_KEY_L:
+                switch (light_mode) {
+                    case DirectionalLight:
+                        light_mode = PointLight;
+                        break;
+                    case PointLight:
+                        light_mode = SpotlightLight;
+                        break;
+                    case SpotlightLight:
+                        light_mode = DirectionalLight;
+                        break;
+                    default:
+                        light_mode = DirectionalLight;
+                        break;
+                }
+                break;
+            case GLFW_KEY_K:
+                cur_trans_mode = LightEdit;
+                break;
+            case GLFW_KEY_J:
+                cur_trans_mode = ShininessEdit;
+                break;
             default:
                 break;
         }
@@ -365,6 +431,19 @@ void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
             break;
         case GeoRotation:
             models[cur_idx].rotation.z += (acosf(-1.0f) / 180.0) * 5 * (float)yoffset;
+            break;
+        case LightEdit:
+            if (light_mode == DirectionalLight || light_mode == PointLight) {
+                Vector3 delta = Vector3((float)yoffset / 20, (float)yoffset / 20, (float)yoffset / 20);
+                lighting.dir_light.diffuse += delta;
+                lighting.point_light.diffuse += delta;
+                lighting.spot_light.diffuse += delta;
+            } else if (light_mode == SpotlightLight) {
+                lighting.spot_light.cutoff_angle += (float)yoffset / 5;
+            }
+            break;
+        case ShininessEdit:
+            lighting.shininess += (float)yoffset;
             break;
     }
 }
@@ -419,6 +498,22 @@ void cursorPosCallback(GLFWwindow* window, double xpos, double ypos) {
                 case GeoRotation:
                     models[cur_idx].rotation.x += acosf(-1.0f) / 180.0 * diff_y * (45.0 / 400.0);
                     models[cur_idx].rotation.y += acosf(-1.0f) / 180.0 * diff_x * (45.0 / 400.0);
+                    break;
+                case LightEdit:
+                    if (mouse_pressed) {
+                        if (light_mode == DirectionalLight) {
+                            lighting.dir_light.position.x -= diff_x / 100;
+                            lighting.dir_light.position.y += diff_y / 100;
+                        } else if (light_mode == PointLight) {
+                            lighting.point_light.position.x -= diff_x / 100;
+                            lighting.point_light.position.y += diff_y / 100;
+                        } else if (light_mode == SpotlightLight) {
+                            lighting.spot_light.position.x -= diff_x / 100;
+                            lighting.spot_light.position.y += diff_y / 100;
+                        }
+                    }
+                    break;
+                default:
                     break;
             }
         }
@@ -508,6 +603,33 @@ void initParameter() {
     main_camera.center = Vector3(0.0f, 0.0f, 0.0f);
     main_camera.up_vector = Vector3(0.0f, 1.0f, 0.0f);
 
+    lighting.shininess = 64.0f;
+
+    lighting.dir_light.position = Vector3(1.0f, 1.0f, 1.0f);
+    lighting.dir_light.center = Vector3(0.0f, 0.0f, 0.0f);
+    lighting.dir_light.ambient = Vector3(0.15f, 0.15f, 0.15f);
+    lighting.dir_light.diffuse = Vector3(1.0f, 1.0f, 1.0f);
+    lighting.dir_light.specular = Vector3(1.0f, 1.0f, 1.0f);
+
+    lighting.point_light.position = Vector3(0.0f, 2.0f, 1.0f);
+    lighting.point_light.ambient = Vector3(0.15f, 0.15f, 0.15f);
+    lighting.point_light.diffuse = Vector3(1.0f, 1.0f, 1.0f);
+    lighting.point_light.specular = Vector3(1.0f, 1.0f, 1.0f);
+    lighting.point_light.attenuation_coefficient[0] = 0.01f;
+    lighting.point_light.attenuation_coefficient[1] = 0.8f;
+    lighting.point_light.attenuation_coefficient[2] = 0.1f;
+
+    lighting.spot_light.position = Vector3(0.0f, 0.0f, 0.2f);
+    lighting.spot_light.direction = Vector3(0.0f, 0.0f, -1.0f);
+    lighting.spot_light.ambient = Vector3(0.15f, 0.15f, 0.15f);
+    lighting.spot_light.diffuse = Vector3(1.0f, 1.0f, 1.0f);
+    lighting.spot_light.specular = Vector3(1.0f, 1.0f, 1.0f);
+    lighting.spot_light.attenuation_coefficient[0] = 0.05f;
+    lighting.spot_light.attenuation_coefficient[1] = 0.3f;
+    lighting.spot_light.attenuation_coefficient[2] = 0.6f;
+    lighting.spot_light.exponent = 50.0f;
+    lighting.spot_light.cutoff_angle = 30.0f;
+
     setViewingMatrix();
     setPerspective();  // set default projection matrix as perspective matrix
 }
@@ -518,6 +640,39 @@ void setUniformVariables() {
     uniform.trans.projection = glGetUniformLocation(program, "trans.projection");
 
     // [TODO] Get uniform location of texture
+
+    uniform.mat.ambient = glGetUniformLocation(program, "mat.ambient");
+    uniform.mat.diffuse = glGetUniformLocation(program, "mat.diffuse");
+    uniform.mat.specular = glGetUniformLocation(program, "mat.specular");
+    uniform.mat.shininess = glGetUniformLocation(program, "mat.shininess");
+
+    uniform.dir_light.direction = glGetUniformLocation(program, "dir_light.direction");
+    uniform.dir_light.ambient = glGetUniformLocation(program, "dir_light.ambient");
+    uniform.dir_light.diffuse = glGetUniformLocation(program, "dir_light.diffuse");
+    uniform.dir_light.specular = glGetUniformLocation(program, "dir_light.specular");
+
+    uniform.point_light.position = glGetUniformLocation(program, "point_light.position");
+    uniform.point_light.ambient = glGetUniformLocation(program, "point_light.ambient");
+    uniform.point_light.diffuse = glGetUniformLocation(program, "point_light.diffuse");
+    uniform.point_light.specular = glGetUniformLocation(program, "point_light.specular");
+    for (int i = 0; i < sizeof(uniform.point_light.attenuation_coefficient) / sizeof(uniform.point_light.attenuation_coefficient[0]); i++) {
+        uniform.point_light.attenuation_coefficient[i] = glGetUniformLocation(program, ("point_light.attenuation_coefficient[" + to_string(i) + "]").c_str());
+    }
+
+    uniform.spot_light.position = glGetUniformLocation(program, "spot_light.position");
+    uniform.spot_light.direction = glGetUniformLocation(program, "spot_light.direction");
+    uniform.spot_light.ambient = glGetUniformLocation(program, "spot_light.ambient");
+    uniform.spot_light.diffuse = glGetUniformLocation(program, "spot_light.diffuse");
+    uniform.spot_light.specular = glGetUniformLocation(program, "spot_light.specular");
+    for (int i = 0; i < sizeof(uniform.spot_light.attenuation_coefficient) / sizeof(uniform.spot_light.attenuation_coefficient[0]); i++) {
+        uniform.spot_light.attenuation_coefficient[i] = glGetUniformLocation(program, ("spot_light.attenuation_coefficient[" + to_string(i) + "]").c_str());
+    }
+    uniform.spot_light.cutoff_angle = glGetUniformLocation(program, "spot_light.cutoff_angle");
+    uniform.spot_light.exponent = glGetUniformLocation(program, "spot_light.exponent");
+
+    uniform.camera_pos = glGetUniformLocation(program, "camera_pos");
+    uniform.light_mode = glGetUniformLocation(program, "light_mode");
+    uniform.per_fragment = glGetUniformLocation(program, "per_fragment");
 }
 
 void setupRC() {
