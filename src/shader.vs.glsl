@@ -59,6 +59,7 @@ uniform int light_mode;
 uniform int per_fragment;
 
 // [TODO] passing uniform variable for texture coordinate offset
+uniform vec2 tex_offset;
 
 vec4 directionalLighting() {
 	vec3 view_light_dir;
@@ -153,7 +154,7 @@ void main() {
 	// [TODO]
 	gl_Position = trans.projection * trans.view * trans.model * vec4(att_pos, 1.0);
 	frag_pos = vec3(trans.view * trans.model * vec4(att_pos, 1.0));
-	tex_coord = att_tex_coord;
+	tex_coord = att_tex_coord + tex_offset;
 	vertex_normal = transpose(inverse(mat3(trans.view * trans.model))) * att_normal;
 	if (per_fragment == 0) {
 		vertex_color = lighting().xyz;

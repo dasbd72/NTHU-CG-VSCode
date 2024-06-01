@@ -261,6 +261,32 @@ void loadTexturedModels(std::string model_path, Model& model) {
         }
         std::cout << "  LoadTexturedModels: Load model's material " << base_dir + std::string(materials[i].diffuse_texname) << " success" << std::endl;
 
+        material.isEye = false;
+        auto set_eye = [&material]() {
+            material.isEye = true;
+
+            material.offsets.emplace_back(0.0f, 0.0f);
+            material.offsets.emplace_back(0.0f, 64.0f);
+            material.offsets.emplace_back(0.0f, 128.0f);
+            material.offsets.emplace_back(0.0f, 192.0f);
+            material.offsets.emplace_back(64.0f, 0.0f);
+            material.offsets.emplace_back(64.0f, 64.0f);
+            material.offsets.emplace_back(64.0f, 128.0f);
+            for (auto& offset : material.offsets) {
+                offset.x /= -128.0f;
+                offset.y /= -256.0f;
+            }
+        };
+        if (std::string(materials[i].diffuse_texname) == "FushigidaneEyeDh.bmp") {
+            set_eye();
+        } else if (std::string(materials[i].diffuse_texname) == "MewEyeDh.bmp") {
+            set_eye();
+        } else if (std::string(materials[i].diffuse_texname) == "NyarthEyeDh.bmp") {
+            set_eye();
+        } else if (std::string(materials[i].diffuse_texname) == "ZenigameEyeDh.bmp") {
+            set_eye();
+        }
+
         allMaterial.push_back(material);
     }
 

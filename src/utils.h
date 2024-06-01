@@ -64,19 +64,20 @@ struct Uniform {
     GLint camera_pos;
     GLint light_mode;
     GLint per_fragment;
+    GLint tex_offset;
 };
 
-typedef struct _Offset {
+struct Offset {
     GLfloat x;
     GLfloat y;
-    /*struct _Offset(GLfloat _x, GLfloat _y) {
-            x = _x;
-            y = _y;
-    };*/
-} Offset;
 
-typedef struct
-{
+    Offset(GLfloat _x, GLfloat _y) {
+        x = _x;
+        y = _y;
+    };
+};
+
+struct PhongMaterial {
     Vector3 Ka;
     Vector3 Kd;
     Vector3 Ks;
@@ -86,10 +87,9 @@ typedef struct
     // eye texture coordinate
     GLuint isEye;
     std::vector<Offset> offsets;
-} PhongMaterial;
+};
 
-typedef struct
-{
+struct Shape {
     GLuint vao;
     GLuint vbo;
     GLuint vboTex;
@@ -100,7 +100,7 @@ typedef struct
     GLuint p_texCoord;
     PhongMaterial material;
     int indexCount;
-} Shape;
+};
 
 struct Model {
     Vector3 position = Vector3(0, 0, 0);

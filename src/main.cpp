@@ -294,6 +294,14 @@ void renderScene(int per_vertex_or_per_pixel) {
         glUniform3fv(uniform.mat.specular, 1, &models[cur_idx].shapes[i].material.Ks.x);
         glUniform1f(uniform.mat.shininess, lighting.shininess);
 
+        // Eye offset
+        if (models[cur_idx].shapes[i].material.isEye) {
+            Offset offset = models[cur_idx].shapes[i].material.offsets[models[cur_idx].cur_eye_offset_idx];
+            glUniform2f(uniform.tex_offset, offset.x, offset.y);
+        } else {
+            glUniform2f(uniform.tex_offset, 0, 0);
+        }
+
         glBindVertexArray(models[cur_idx].shapes[i].vao);
 
         // [TODO] Bind texture and modify texture filtering & wrapping mode
@@ -310,6 +318,7 @@ void renderScene(int per_vertex_or_per_pixel) {
         } else {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
         }
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 
         glDrawArrays(GL_TRIANGLES, 0, models[cur_idx].shapes[i].vertex_count);
     }
@@ -398,6 +407,16 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
                 break;
             case GLFW_KEY_J:
                 cur_trans_mode = ShininessEdit;
+                break;
+            case GLFW_KEY_RIGHT:
+                if (models[cur_idx].hasEye) {
+                    models[cur_idx].cur_eye_offset_idx = (models[cur_idx].cur_eye_offset_idx + 1) % models[cur_idx].max_eye_offset;
+                }
+                break;
+            case GLFW_KEY_LEFT:
+                if (models[cur_idx].hasEye) {
+                    models[cur_idx].cur_eye_offset_idx = (models[cur_idx].cur_eye_offset_idx - 1 + models[cur_idx].max_eye_offset) % models[cur_idx].max_eye_offset;
+                }
                 break;
             default:
                 break;
@@ -673,6 +692,7 @@ void setUniformVariables() {
     uniform.camera_pos = glGetUniformLocation(program, "camera_pos");
     uniform.light_mode = glGetUniformLocation(program, "light_mode");
     uniform.per_fragment = glGetUniformLocation(program, "per_fragment");
+    uniform.tex_offset = glGetUniformLocation(program, "tex_offset");
 }
 
 void setupRC() {
@@ -687,6 +707,12 @@ void setupRC() {
     for (string model_path : model_list) {
         Model tmp_model;
         loadTexturedModels(model_path, tmp_model);
+        for (Shape& shape : tmp_model.shapes) {
+            if (shape.material.isEye) {
+                tmp_model.hasEye = true;
+                tmp_model.max_eye_offset = shape.material.offsets.size();
+            }
+        }
         models.push_back(tmp_model);
     }
 }
