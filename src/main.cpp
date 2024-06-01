@@ -238,8 +238,6 @@ void vector3ToFloat4(Vector3 v, GLfloat res[4]) {
 
 // Render function for display rendering
 void renderScene(int per_vertex_or_per_pixel) {
-    Vector3 modelPos = models[cur_idx].position;
-
     Matrix4 T, R, S;
     T = translate(models[cur_idx].position);
     R = rotate(models[cur_idx].rotation);
