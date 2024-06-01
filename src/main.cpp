@@ -727,7 +727,7 @@ int main(int argc, char** argv) {
 #endif
 
     // create window
-    GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2, "Student ID HW3", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(WINDOW_WIDTH / 2, WINDOW_HEIGHT / 2, "109062131 HW3", NULL, NULL);
     if (window == NULL) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
