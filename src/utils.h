@@ -27,7 +27,6 @@ struct Uniform {
     } trans;
 };
 
-
 typedef struct _Offset {
     GLfloat x;
     GLfloat y;

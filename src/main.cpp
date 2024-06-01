@@ -248,6 +248,8 @@ void renderScene(int per_vertex_or_per_pixel) {
 
         // [TODO] Bind texture and modify texture filtering & wrapping mode
         // Hint: glActiveTexture, glBindTexture, glTexParameteri
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, models[cur_idx].shapes[i].material.diffuseTexture);
 
         glDrawArrays(GL_TRIANGLES, 0, models[cur_idx].shapes[i].vertex_count);
     }

@@ -6,6 +6,7 @@ layout (location = 2) in vec3 att_normal;
 layout (location = 3) in vec2 att_tex_coord;
 
 out vec2 tex_coord;
+out vec3 vertex_color;
 
 struct Transform {
 	mat4 model;
@@ -18,6 +19,7 @@ uniform Transform trans;
 
 void main() {
 	// [TODO]
-	tex_coord = att_tex_coord;
 	gl_Position = trans.projection * trans.view * trans.model * vec4(att_pos, 1.0);
+	tex_coord = att_tex_coord;
+	vertex_color = att_color;
 }
