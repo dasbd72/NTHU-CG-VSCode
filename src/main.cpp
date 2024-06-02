@@ -28,12 +28,19 @@ using namespace std;
 // Default window size
 const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 600;
+const double ANIMATIONS_PER_SECOND = 10.0;
 
 // current window size
 int frame_width, frame_height;
 bool mouse_pressed = false;
 int starting_press_x = -1;
 int starting_press_y = -1;
+double prev_pre_render_ts = 0.0;
+int blinks_phase = 0;
+double prev_blinks_ts = 0.0;
+double blinks_idle_time_remaining = 0;
+int blinks_remaining = 0;
+int blinks_direction = 1;
 int cur_idx = 0;  // represent which model should be rendered now
 vector<string> model_list{"../TextureModels/Fushigidane.obj", "../TextureModels/Mew.obj", "../TextureModels/Nyarth.obj", "../TextureModels/Zenigame.obj", "../TextureModels/laurana500.obj", "../TextureModels/Nala.obj", "../TextureModels/Square.obj"};
 vector<string> filenames;  // .obj filename list
@@ -49,6 +56,7 @@ TransMode cur_trans_mode = GeoTranslation;
 MagFilterMode mag_filter = MagFilterNearest;
 MinFilterMode min_filter = MinFilterNearest;
 LightMode light_mode = DirectionalLight;
+int animation_mode = 0;
 
 Matrix4 view_matrix;
 Matrix4 project_matrix;
@@ -68,6 +76,7 @@ void setOrthogonal();
 void setPerspective();
 void changeSize(GLFWwindow* window, int width, int height);
 void vector3ToFloat4(Vector3 v, GLfloat res[4]);
+void preRender();
 void renderScene(int per_vertex_or_per_pixel);
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
@@ -233,6 +242,59 @@ void vector3ToFloat4(Vector3 v, GLfloat res[4]) {
     res[1] = v.y;
     res[2] = v.z;
     res[3] = 1;
+}
+
+void preRender() {
+    if (prev_pre_render_ts == 0.0) {
+        prev_pre_render_ts = glfwGetTime();
+        return;
+    }
+
+    // update FPS
+    double current_time = glfwGetTime();
+    double time_delta = current_time - prev_pre_render_ts;
+
+    // Update animation
+    if (animation_mode == 1 && models[cur_idx].hasEye) {
+        double blinks_time_delta = current_time - prev_blinks_ts;
+
+        if ((blinks_time_delta > 1.0 / ANIMATIONS_PER_SECOND + 1.0) ||
+            (models[cur_idx].cur_eye_offset_idx < 0 || models[cur_idx].cur_eye_offset_idx > 2)) {
+            // Time out or invalid eye offset
+            // Reset blinking animation
+            models[cur_idx].cur_eye_offset_idx = 0;
+            blinks_phase = 0;
+            prev_blinks_ts = current_time;
+            blinks_idle_time_remaining = 0;
+            blinks_remaining = 1;
+            blinks_direction = 1;
+        } else if (blinks_idle_time_remaining > 0) {
+            // Idle time
+            prev_blinks_ts = current_time;
+            blinks_idle_time_remaining -= blinks_time_delta;
+        } else if (blinks_time_delta > 1.0 / ANIMATIONS_PER_SECOND) {
+            // Blinking
+            models[cur_idx].cur_eye_offset_idx += blinks_direction;
+            if (models[cur_idx].cur_eye_offset_idx == 0) {
+                blinks_remaining--;
+            }
+            if (blinks_remaining == 0 && blinks_phase == 0) {
+                blinks_phase = 1;
+                blinks_remaining = 2;
+                blinks_idle_time_remaining = 10.0 / ANIMATIONS_PER_SECOND;
+            } else if (blinks_remaining == 0 && blinks_phase == 1) {
+                blinks_phase = 0;
+                blinks_remaining = 1;
+                blinks_idle_time_remaining = 10.0 / ANIMATIONS_PER_SECOND;
+            }
+            if (models[cur_idx].cur_eye_offset_idx == 0 || models[cur_idx].cur_eye_offset_idx == 2) {
+                blinks_direction = -blinks_direction;
+            }
+            prev_blinks_ts = current_time;
+        }
+    }
+
+    prev_pre_render_ts = current_time;
 }
 
 // Render function for display rendering
@@ -414,6 +476,10 @@ void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods
                 if (models[cur_idx].hasEye) {
                     models[cur_idx].cur_eye_offset_idx = (models[cur_idx].cur_eye_offset_idx - 1 + models[cur_idx].max_eye_offset) % models[cur_idx].max_eye_offset;
                 }
+                break;
+            case GLFW_KEY_SPACE:
+                animation_mode = (animation_mode + 1) % 2;
+                cout << "Animation mode: " << animation_mode << endl;
                 break;
             default:
                 break;
@@ -756,6 +822,8 @@ int main(int argc, char** argv) {
 
     // main loop
     while (!glfwWindowShouldClose(window)) {
+        // pre-render process
+        preRender();
         // render
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
         // render left view
